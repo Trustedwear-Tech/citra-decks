@@ -1,68 +1,53 @@
-# Citra-Service
+# Citra Decks
 
-Core AI backend for the Citra platform. Handles all AI-powered features including chat, vault operations, document generation, diagrams, knowledge graphs, internet search, and database queries.
+**Sovereign presentations, visual reports and long-form documents — generated
+from your own data, on your own infrastructure.**
 
-## Tech Stack
+Three composers, one engine:
 
-- Python 3.11 / FastAPI / Gunicorn
-- MongoDB (document store)
-- Milvus (vector search / RAG)
-- Redis (cache / sessions)
-- MinIO or S3 (file storage)
+- **Presentations** — slide decks grounded in your operational data
+- **Visual reports** — print-ready A4 documents
+- **Long-form documents** — Word-style reports drafted from your knowledge base
 
-## Port
+Every figure traces back to a source. Not a generic slide tool: the numbers come
+from your files and your systems, and the deck can be regenerated when the data
+changes.
 
-- **7001** (production)
-- **8085** (local development with `uvicorn --reload`)
+> **Pre-release.** This tree was cut from a larger platform. It builds and
+> imports cleanly, but it has not been run end to end as a standalone product,
+> and there is no host UI shell yet. See `PORTING.md`.
 
-## Configuration
+## Why self-host this
 
-Supports two methods:
+Presentation and document tools are where confidential material goes to get
+formatted. Board packs, incident reports, credit memos, patient summaries — the
+things you would least like to paste into someone else's cloud.
 
-1. **`.env` file** — Copy `.env.example` to `.env` and fill in values.
-2. **HashiCorp Vault** — Delete `.env`, set `VAULT_ADDR` + auth credentials. The `vault_env_loader.py` module loads secrets from Vault at startup. In production (`prod/*` mount path), the service will refuse to start if Vault secrets cannot be loaded.
+Start on a hosted model API to evaluate. Point `LLM_BASE_URL` at your own vLLM
+or Ollama endpoint for production, and nothing leaves your network.
 
-See `.env.example` for all available environment variables.
+## What is here
 
-## Local Development
+| Path | What |
+|---|---|
+| `presentation_api.py`, `slide_templates.py` | deck generation |
+| `printable/` | A4 visual reports |
+| `composer_*.py`, `services/edit_orchestrator.py` | the shared authoring engine |
+| `ui/composer`, `ui/printable` | the editors |
+| `citra-*/` | six shared packages, vendored |
 
-```bash
-python -m venv myenv
-myenv\Scripts\activate        # Windows
-# source myenv/bin/activate   # Linux/macOS
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8085
-```
+It also carries the platform spine the composers need — RAG retrieval, document
+ingestion, object storage, personal vaults. That is not accidental bloat: the
+composers ground their output in your documents, and the retrieval path is the
+product. See `VENDORED.md`.
 
-## Docker
+## Requirements
 
-```bash
-docker build -t citra-service .
-docker run -p 7001:7001 --env-file .env citra-service
-```
+Mongo · Milvus (vectors) · object storage (S3/MinIO) · a sandbox for computing
+real figures from spreadsheets · an OpenAI-compatible model endpoint.
 
-## Health Check
+## Licence
 
-```
-GET /health
-```
+Apache-2.0. See `LICENSE`.
 
-## Authentication
-
-Citra-Service validates incoming requests using JWT tokens issued by **Citra-User-Service**. It does not handle login or registration directly.
-
-- Every API request must include an `Authorization: Bearer <token>` header.
-- Tokens are verified using the shared `JWT_SECRET` (must match the value in Citra-User-Service).
-- Both Google OAuth and email/password tokens use the same JWT format — Citra-Service does not need to know which auth method was used.
-
-For auth provider setup (Google OAuth, email/password, email configuration), see the **Citra-User-Service** README.
-
-## Key Directories
-
-| Path | Description |
-|------|-------------|
-| `services/` | Business logic — chat, presentations, reports, diagrams, vault, internet search |
-| `routes/` | FastAPI route handlers |
-| `vault_env_loader.py` | `.env` + HashiCorp Vault config loader |
-| `llm_client.py` | Multi-provider LLM client (OpenAI, Perplexity, Google, self-hosted, etc.) |
-| `main.py` | Application entry point |
+Trustedwear Tech Private Limited · contact@citra-ai.com · https://citra-ai.com
