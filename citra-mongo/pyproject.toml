@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citra-mongo"
+version = "1.0.0"
+description = "Shared MongoDB connection manager. Singleton sync + async Motor/PyMongo client with pool tuning, loop-aware re-creation, and config via env vars. One source of truth so Citra-Service, citra-workflow, and any other Python service open Mongo the same way."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "motor>=3.3",
+  "pymongo>=4.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["citra_mongo*"]

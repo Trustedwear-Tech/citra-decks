@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citra-queue"
+version = "1.0.0"
+description = "Redis-backed job queue producer + consumer. One source of truth used by Citra-Service (enqueues workflow runs / inheritance jobs), citra-workflow (enqueues /execute jobs), and Citra-Worker (consumes everything). Replaces the previously-duplicated worker_queue.py files."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "redis>=5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["citra_queue*"]

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citra-cache"
+version = "1.0.0"
+description = "Centralised Redis cache manager. Replaces the previously-duplicated cache_manager.py imported across services via PYTHONPATH. One source of truth for cache key prefixes, connection pooling, and Redis-error propagation rules."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "redis>=5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["citra_cache*"]
