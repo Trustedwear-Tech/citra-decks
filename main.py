@@ -133,14 +133,11 @@ class LargeFileMiddleware:
 # semantic_search_api.py removed — unrelated to the presentation/printable/
 # report composers. See docs (Part B of the OSS cleanup pass).
 #
-# PERSONAL FILE UPLOAD/STORAGE removed 2026-08-09 — citra-decks doesn't
-# store user-uploaded source documents; folders are generation-scoped
-# context only. document_manager_router (create/list/update/delete
-# document, OCR, upload-from-url) is no longer mounted. document_manager.py
-# itself is kept as an importable module — services/internet_prefetch.py
-# (a real composer-generation dependency, grounding via web research)
-# still calls two of its helpers (create_embeddings_and_store_milvus,
-# save_file_to_s3_storage) directly.
+# document_manager_router: source-document upload for presentation/printable/
+# report generation (create/list/update/delete document, OCR, upload-from-url).
+# Restored 2026-08-09 — briefly unmounted, but uploads to the personal data
+# store (folder) are required by all three composers, not optional.
+from document_manager import router as document_manager_router
 from persona import router as persona_router
 from bucket import router as bucket_router
 
@@ -184,9 +181,15 @@ from folder_management import router as folder_management_router
 # minting JWTs the JWTAuthMiddleware below verifies.
 from api.local_auth import router as local_auth_router
 
-# CHUNKED DOCUMENTS removed 2026-08-09 — browse/paginate/delete for
-# manually-uploaded personal documents, same removal as document_manager's
-# upload endpoints above. Nothing composer-critical consumed this router.
+# CHUNKED DOCUMENTS: Large document handling with pagination — document_manager.py
+# (composer ingestion) depends on this. Restored alongside document_manager_router.
+try:
+    from api.chunked_documents import router as chunked_documents_router
+    CHUNKED_DOCUMENTS_AVAILABLE = True
+    logger.info("📦 Chunked documents API imported successfully")
+except ImportError as e:
+    logger.warning(f"📦 Chunked documents API not available: {e}")
+    CHUNKED_DOCUMENTS_AVAILABLE = False
 
 # FILES: Centralized file metadata tracking — the folder-detail popup's file
 # list (GET /api/v2/files?folder_id=X) depends on this.
@@ -641,6 +644,7 @@ app.add_middleware(
 )
 
 # Include routers with V2 API endpoints only (no prefix changes to maintain compatibility)
+app.include_router(document_manager_router, prefix="", tags=["Document Management"])
 app.include_router(composer_query_router, prefix="", tags=["Composer"])
 app.include_router(composer_context_router, prefix="", tags=["Composer Context"])
 
@@ -728,6 +732,11 @@ except Exception as e:
 # video_upload / openai_compat / quick_chat removed — unrelated to composers
 # (reader, quick_chat and the "project management" else-branch below were
 # already no-op stubs before removal).
+
+# Only include chunked documents router if available
+if CHUNKED_DOCUMENTS_AVAILABLE:
+    app.include_router(chunked_documents_router, prefix="")
+    logger.info("📦 Chunked documents API registered")
 
 # Only include files router if available
 if FILES_AVAILABLE:
