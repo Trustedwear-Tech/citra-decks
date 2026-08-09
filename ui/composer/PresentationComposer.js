@@ -41,14 +41,8 @@ import ImageGenService from '../../services/ImageGenService';
 import globalImageCache from '../../utils/globalImageCache';
 import { generateImagesParallel } from '../../services/imageGenerationUtils';
 import { prefetchIcons } from './utils/iconMapper';
-import DiagramModeSelector from '../DiagramModeSelector';
-import DiagramBrowser from '../DiagramBrowser';
 import UnifiedUploadModal from '../UnifiedUploadModal'; // Unified upload modal
-import VaultRequiredModal from '../VaultRequiredModal'; // For vault modal inside fullScreen portal
 import UploadProgressPopup from '../UploadProgressPopup'; // Upload progress popup for visibility inside modal
-// import DiagramPanel from '../DiagramPanel'; // REMOVED - Unified Diagram Screen
-import DiagramChatInterface from '../DiagramChatInterface';
-import DocumentSelectorModal from '../DocumentSelectorModal';
 import { buildSlidesSummary } from '../../utils/slideTextExtractor';
 import DeckChromeOverlay from './DeckChromeOverlay';
 import LayerPanel from './LayerPanel';
@@ -349,12 +343,9 @@ const PresentationComposer = ({
   onUsePrefill = null,       // called once the prefill has been consumed
   selectedFolders = [],
   folders = [],
-  onSelectFolder,
-  onCreateVault,
   onOpenTemplateUpload, // Legacy callback - now using internal modal
   // Upload modal props - rendered inside fullScreen portal to appear on top
   uploadModalProps = null,
-  vaultModalProps = null, // Props for vault modal inside fullScreen portal
   enhancedProgress = null, // Upload progress for popup visibility inside modals
   onDismissUploadEntry = null, // Callback to remove a single upload entry from progress map
   mobileViewOnly = false, // Mobile web: generation works, editing disabled
@@ -669,16 +660,6 @@ const PresentationComposer = ({
 
   // Close confirmation modal
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
-
-  // Diagram State
-  // const [showDiagramPanel, setShowDiagramPanel] = useState(false); // REMOVED
-  const [showDiagramBrowser, setShowDiagramBrowser] = useState(false);
-  const [showDiagramMode, setShowDiagramMode] = useState(false);
-  const [showDiagramChat, setShowDiagramChat] = useState(false); // For 'create' mode
-  const [showDocumentSelector, setShowDocumentSelector] = useState(false); // For 'generate' mode
-  const [selectedDocumentsForDiagram, setSelectedDocumentsForDiagram] = useState([]); // Selected docs for diagram generation
-  const [diagramMode, setDiagramMode] = useState('create');
-  const [currentDiagram, setCurrentDiagram] = useState(null);
 
   // UI State
   const [sidebarWidth, setSidebarWidth] = useState(150);
@@ -1715,117 +1696,6 @@ const PresentationComposer = ({
     });
     setShowAIDiagramModal(true);
   }, []);
-
-  const handleDiagramModeSelect = (mode) => {
-    setShowDiagramMode(false);
-    setDiagramMode(mode);
-    setCurrentDiagram(null);
-
-    if (mode === 'open') {
-      // Open existing diagram from saved list
-      setShowDiagramBrowser(true);
-    } else if (mode === 'create') {
-      // Create new diagram via AI chat
-      setShowDiagramChat(true);
-    } else if (mode === 'generate') {
-      // Generate diagram from documents - show document selector first
-      setShowDocumentSelector(true);
-    }
-  };
-
-  // Handle documents selected for diagram generation
-  const handleDocumentsSelected = (documents) => {
-    console.log('📄 Documents selected for diagram:', documents.map(d => d.topic_or_filename));
-    setSelectedDocumentsForDiagram(documents);
-    setShowDocumentSelector(false);
-    setShowDiagramChat(true); // Open Unified Screen with selected documents
-  };
-
-  const handleSelectDiagram = (diagram) => {
-    setShowDiagramBrowser(false);
-    setCurrentDiagram(diagram);
-    setDiagramMode('open');
-    setShowDiagramChat(true); // Unified Unified Screen
-  };
-
-  // handleExportDiagram removed - merged into Chat Interface flow
-
-  // Export diagram from chat interface (create mode)
-  const handleExportDiagramFromChat = (base64Image) => {
-    if (canvasRef.current && canvasRef.current.addDiagram) {
-      canvasRef.current.addDiagram(base64Image);
-      setTimeout(() => setShowDiagramChat(false), 200);
-    }
-  };
-
-  // State for diagram generation result
-  // Unused state removed
-  // const [generatedDiagramData, setGeneratedDiagramData] = useState(null);
-  // const [isDiagramGenerating, setIsDiagramGenerating] = useState(false);
-  // const [diagramGenerationError, setDiagramGenerationError] = useState(null);
-
-  // Generate diagram from selected documents
-  const handleDiagramGenerate = async (query) => {
-    if (!query.trim()) {
-      Alert.alert('Query Required', 'Please enter a description of the diagram you want to generate.');
-      return;
-    }
-
-    if (!selectedDocumentsForDiagram || selectedDocumentsForDiagram.length === 0) {
-      Alert.alert('No Documents', 'Please select documents first to generate a diagram from.');
-      return;
-    }
-
-    setIsDiagramGenerating(true);
-    setDiagramGenerationError(null);
-
-    try {
-      const documentIds = selectedDocumentsForDiagram.map(doc => doc.document_id);
-      console.log('📊 Generating diagram from documents:', documentIds);
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        user_id: userDeviceId,
-        query: query,
-        document_ids: documentIds.join(',')
-      });
-
-      const response = await authService.authenticatedFetch(
-        `${API_CONFIG.CITRA_SERVICE_URL}/api/diagram/generate?${params.toString()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate diagram: ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Diagram generated successfully:', result);
-
-      // Set the generated diagram data
-      if (result.success && result.diagram) {
-        setGeneratedDiagramData([{
-          diagram_data: result.diagram.diagram_data,
-          diagram_type: result.diagram.diagram_type || 'flowchart',
-          document_name: 'Generated Diagram',
-          documents: result.diagram.documents
-        }]);
-      } else {
-        throw new Error(result.error || 'Diagram generation failed');
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to generate diagram:', error);
-      setDiagramGenerationError(error.message);
-      Alert.alert('Generation Error', error.message || 'Failed to generate diagram. Please try again.');
-    } finally {
-      setIsDiagramGenerating(false);
-    }
-  };
 
   // AI enhancement for current slide - uses orchestrator for intent classification
   // Supports background override: handleAiEnhance(instruction, targetSlide, true) for auto layout fix
@@ -6133,12 +6003,9 @@ const PresentationComposer = ({
               userDeviceId={userDeviceId}
               selectedFolders={selectedFolders}
               folders={folders}
-              onSelectFolder={onSelectFolder}
-              onCreateVault={onCreateVault}
               theme={safeTheme}
               persona={persona}
               uploadModalProps={uploadModalProps}
-              vaultModalProps={vaultModalProps}
               enhancedProgress={enhancedProgress}
             />
           </Modal>
@@ -6345,61 +6212,6 @@ const PresentationComposer = ({
           onOpenCredits={onOpenCredits}
         />
 
-        {/* Diagram Modals */}
-        <DiagramModeSelector
-          isVisible={showDiagramMode}
-          onClose={() => setShowDiagramMode(false)}
-          onSelectMode={handleDiagramModeSelect}
-          theme={theme}
-        />
-
-        <DiagramBrowser
-          isVisible={showDiagramBrowser}
-          onClose={() => setShowDiagramBrowser(false)}
-          onSelectDiagram={handleSelectDiagram}
-          theme={theme}
-          onEdit={(diagram) => {
-            setCurrentDiagram(diagram);
-            setDiagramMode('open'); // or edit
-            setShowDiagramBrowser(false);
-            setShowDiagramChat(true); // Opened unified screen
-          }}
-        />
-
-        {/* DiagramPanel removed - merged into DiagramChatInterface */}
-
-        {/* Diagram Chat Interface - for 'create' mode AI chat diagram creation */}
-        <DiagramChatInterface
-          isVisible={showDiagramChat}
-          onClose={() => setShowDiagramChat(false)}
-          onSave={(savedDiagram) => {
-            console.log('Diagram saved from chat:', savedDiagram);
-          }}
-          onExport={handleExportDiagramFromChat}
-          theme={theme}
-          currentUserEmail={userDeviceId}
-          initialDiagram={currentDiagram}
-          selectedFolders={selectedFolders} // NEW: Vault folders for semantic search
-          pageContext={currentSlide}        // NEW: Current slide content for AI context
-          sourceContext="presentation"      // NEW: Source context
-          mode={diagramMode === 'open' ? 'edit' : 'create'}
-          contextLabel="Presentation"
-        />
-
-        {/* Document Selector Modal - for 'generate from documents' mode */}
-        <DocumentSelectorModal
-          visible={showDocumentSelector}
-          onClose={() => setShowDocumentSelector(false)}
-          onSelect={handleDocumentsSelected}
-          folderId={null}
-          currentUserEmail={userDeviceId}
-          theme={theme}
-          multiSelect={true}
-          maxSelection={10}
-          showLimitWarning={true}
-          featureName="Diagram"
-        />
-
         {/* Delete Confirmation Modal */}
         <Modal visible={showDeleteModal} transparent animationType="fade" onRequestClose={cancelDeleteSlide}>
           <View style={styles.modalOverlay}>
@@ -6485,14 +6297,6 @@ const PresentationComposer = ({
           onClose={() => setShowInternalUploadModal(false)}
           theme={theme}
         />
-
-        {/* Internal Vault Modal - Rendered inside fullScreen portal to ensure it appears on TOP */}
-        {vaultModalProps && (
-          <VaultRequiredModal
-            {...vaultModalProps}
-            theme={theme}
-          />
-        )}
 
         {/* Upload Progress Popup - Rendered inside modal so it's visible above overlay */}
         <UploadProgressPopup

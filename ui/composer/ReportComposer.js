@@ -26,15 +26,9 @@ import ChartEditModal from './ChartEditModal';
 import AIImageModal from './AIImageModal';
 
 import { renderChartToImage } from '../../utils/chartRenderer';
-import DiagramModeSelector from '../DiagramModeSelector';
-import DiagramBrowser from '../DiagramBrowser';
-import DiagramPanel from '../DiagramPanel';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import DiagramChatInterface from '../DiagramChatInterface';
-import DocumentSelectorModal from '../DocumentSelectorModal';
 import { navigateToReport } from '../../utils/urlRouter';
 import UnifiedUploadModal from '../UnifiedUploadModal'; // Unified upload modal
-import VaultRequiredModal from '../VaultRequiredModal'; // For vault modal inside fullScreen portal
 import UploadProgressPopup from '../UploadProgressPopup'; // Upload progress popup for visibility inside modal
 
 import authService from '../../services/authService';
@@ -518,12 +512,9 @@ const ReportComposer = ({
 
   selectedFolders = [],
   folders = [],
-  onSelectFolder,
-  onCreateVault,
   onOpenCredits, // Callback to open credits/upgrade modal
   onOpenTemplateUpload, // New prop
   uploadModalProps = null, // Props for internal upload modal
-  vaultModalProps = null, // Props for vault modal inside fullScreen portal
   enhancedProgress = null, // Upload progress for popup visibility inside modals
   onDismissUploadEntry = null, // Callback to remove a single upload entry from progress map
   mobileViewOnly = false, // Mobile web: view-only mode, no editing
@@ -587,21 +578,6 @@ const ReportComposer = ({
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
   const [addPageInsertIndex, setAddPageInsertIndex] = useState(null);
 
-  // Diagram State
-  const [showDiagramMode, setShowDiagramMode] = useState(false);
-  const [showDiagramBrowser, setShowDiagramBrowser] = useState(false);
-  const [showDiagramPanel, setShowDiagramPanel] = useState(false);
-  const [showDiagramChat, setShowDiagramChat] = useState(false); // For 'create' mode
-  const [showDocumentSelector, setShowDocumentSelector] = useState(false); // For 'generate' mode
-  const [selectedDocumentsForDiagram, setSelectedDocumentsForDiagram] = useState([]); // Selected docs for diagram generation
-
-  // State for diagram generation result
-  const [generatedDiagramData, setGeneratedDiagramData] = useState(null);
-  const [isDiagramGenerating, setIsDiagramGenerating] = useState(false);
-  const [diagramGenerationError, setDiagramGenerationError] = useState(null);
-
-  const [diagramMode, setDiagramMode] = useState('create');
-  const [currentDiagram, setCurrentDiagram] = useState(null);
   // Page management state
   const [editingPageTitleId, setEditingPageTitleId] = useState(null);
   const [editingPageTitleText, setEditingPageTitleText] = useState('');
@@ -1589,76 +1565,6 @@ const ReportComposer = ({
     return { processedHtml, imageMap, embedMap, chartConfigMap };
   };
 
-  // Diagram Handlers
-  const handleOpenDiagram = () => setShowDiagramMode(true);
-
-  const handleDiagramModeSelect = (mode) => {
-    setShowDiagramMode(false);
-    setDiagramMode(mode);
-    setCurrentDiagram(null);
-
-    if (mode === 'open') {
-      setShowDiagramBrowser(true);
-    } else if (mode === 'create') {
-      // Create new diagram via AI chat
-      setShowDiagramChat(true);
-    } else if (mode === 'generate') {
-      // Generate diagram from documents - show document selector first
-      setShowDocumentSelector(true);
-    }
-  };
-
-  // Handle documents selected for diagram generation
-  const handleDocumentsSelected = (documents) => {
-    console.log('📄 Documents selected for diagram:', documents.map(d => d.topic_or_filename));
-    setSelectedDocumentsForDiagram(documents);
-    setShowDocumentSelector(false);
-    setCurrentDiagram(null); // Clear any existing diagram
-    setShowDiagramChat(true); // Open Diagram Chat Interface
-  };
-
-  const handleSelectDiagram = (diagram) => {
-    setShowDiagramBrowser(false);
-    setCurrentDiagram(diagram);
-    setDiagramMode('open');
-    setShowDiagramChat(true); // Open Diagram Chat Interface
-  };
-
-  const handleExportDiagram = (base64Image) => {
-    // Insert into Tiptap using JSON node so width attribute is properly tracked
-    if (editorRef.current && editorRef.current.insertContent) {
-      editorRef.current.insertContent({
-        type: 'image',
-        attrs: {
-          src: base64Image,
-          alt: 'Diagram',
-          width: '80%',
-        },
-      });
-      setTimeout(() => setShowDiagramPanel(false), 200);
-    } else {
-      Alert.alert('Error', 'Editor not ready');
-    }
-  };
-
-  // Export diagram from chat interface (create mode)
-  const handleExportDiagramFromChat = (base64Image) => {
-    // Insert into Tiptap using JSON node so width attribute is properly tracked
-    if (editorRef.current && editorRef.current.insertContent) {
-      editorRef.current.insertContent({
-        type: 'image',
-        attrs: {
-          src: base64Image,
-          alt: 'Diagram',
-          width: '80%',
-        },
-      });
-      setTimeout(() => setShowDiagramChat(false), 200);
-    } else {
-      Alert.alert('Error', 'Editor not ready');
-    }
-  };
-
   // Insert AI Generated Image
   const handleInsertAIImage = useCallback(async (imageUrl, description) => {
     if (editorRef.current && editorRef.current.insertContent) {
@@ -1690,70 +1596,6 @@ const ReportComposer = ({
       updatePageContent(currentPageId, (currentPage?.content || '') + `\n\n![${description || 'AI Image'}](${imageUrl})`);
     }
   }, [updatePageContent, currentPageId, currentPage]);
-
-  // Generate diagram from selected documents
-  const handleDiagramGenerate = async (query) => {
-    if (!query.trim()) {
-      Alert.alert('Query Required', 'Please enter a description of the diagram you want to generate.');
-      return;
-    }
-
-    if (!selectedDocumentsForDiagram || selectedDocumentsForDiagram.length === 0) {
-      Alert.alert('No Documents', 'Please select documents first to generate a diagram from.');
-      return;
-    }
-
-    setIsDiagramGenerating(true);
-    setDiagramGenerationError(null);
-
-    try {
-      const documentIds = selectedDocumentsForDiagram.map(doc => doc.document_id);
-      console.log('📊 Generating diagram from documents:', documentIds);
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        query: query,
-        document_ids: documentIds.join(',')
-      });
-
-      const response = await authService.authenticatedFetch(
-        `${API_CONFIG.CITRA_SERVICE_URL}/api/diagram/generate?${params.toString()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate diagram: ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Diagram generated successfully:', result);
-
-      // Set the generated diagram data
-      if (result.success && result.diagram) {
-        setGeneratedDiagramData([{
-          diagram_data: result.diagram.diagram_data,
-          diagram_type: result.diagram.diagram_type || 'flowchart',
-          document_name: 'Generated Diagram',
-          documents: result.diagram.documents
-        }]);
-      } else {
-        throw new Error(result.error || 'Diagram generation failed');
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to generate diagram:', error);
-      setDiagramGenerationError(error.message);
-      Alert.alert('Generation Error', error.message || 'Failed to generate diagram. Please try again.');
-    } finally {
-      setIsDiagramGenerating(false);
-    }
-  };
-
-
 
   // Helper to restore images and embeds from placeholders
   const restoreImages = (html, imageMap, embedMap = {}, chartConfigMap = {}) => {
@@ -4170,16 +4012,6 @@ ${pagesHtml}
 
               {/* Insert Image Button removed, available in Tiptap format toolbar */}
 
-              {/* Diagram Button */}
-              <Tooltip text="Insert Diagram" theme={safeTheme}>
-                <TouchableOpacity
-                  style={styles.ghostBtn}
-                  onPress={handleOpenDiagram}
-                >
-                  <Ionicons name="git-network-outline" size={20} color={safeTheme.text} />
-                </TouchableOpacity>
-              </Tooltip>
-
               {/* Insert Chart Button */}
               <Tooltip text="Insert Chart" theme={safeTheme}>
                 <TouchableOpacity
@@ -5011,11 +4843,8 @@ ${pagesHtml}
           userDeviceId={userDeviceId}
           selectedFolders={selectedFolders}
           folders={folders}
-          onSelectFolder={onSelectFolder}
-          onCreateVault={onCreateVault}
           persona={persona}
           uploadModalProps={uploadModalProps}
-          vaultModalProps={vaultModalProps}
         />
 
         <ExportModal
@@ -5153,57 +4982,6 @@ ${pagesHtml}
           theme={safeTheme}
         />
 
-        {/* Diagram Modals */}
-        <DiagramModeSelector
-          isVisible={showDiagramMode}
-          onClose={() => setShowDiagramMode(false)}
-          onSelectMode={handleDiagramModeSelect}
-          theme={safeTheme}
-        />
-
-        <DiagramBrowser
-          isVisible={showDiagramBrowser}
-          onClose={() => setShowDiagramBrowser(false)}
-          onSelectDiagram={handleSelectDiagram}
-          theme={safeTheme}
-          onEdit={(diagram) => {
-            setCurrentDiagram(diagram);
-            setDiagramMode('open');
-            setShowDiagramBrowser(false);
-            setShowDiagramChat(true); // Redirect to Chat Interface
-          }}
-        />
-
-        {showDocumentSelector && (
-          <DocumentSelectorModal
-            visible={showDocumentSelector}
-            onClose={() => setShowDocumentSelector(false)}
-            onSelect={handleDocumentsSelected}
-            theme={safeTheme}
-          />
-        )}
-
-        {/* DiagramPanel removed - merged into DiagramChatInterface */}
-
-        <DiagramChatInterface
-          isVisible={showDiagramChat}
-          onClose={() => {
-            setShowDiagramChat(false);
-            setCurrentDiagram(null);
-            setSelectedDocumentsForDiagram([]);
-          }}
-          onExport={handleExportDiagramFromChat}
-          theme={safeTheme}
-          initialDiagram={currentDiagram}
-          initialDocuments={selectedDocumentsForDiagram}
-          selectedFolders={selectedFolders} // NEW: Vault folders for semantic search
-          pageContext={currentPage}         // NEW: Current page content for AI context
-          sourceContext="report"            // NEW: Source context
-          mode={currentDiagram ? 'edit' : 'create'}
-          currentUserEmail={userDeviceId}
-          contextLabel="Report"
-        />
-
         {/* Internal Upload Modal - Rendered inside fullScreen portal to ensure it appears on TOP */}
         <UnifiedUploadModal
           {...(uploadModalProps || {})}
@@ -5211,14 +4989,6 @@ ${pagesHtml}
           onClose={() => setShowInternalUploadModal(false)}
           theme={theme}
         />
-
-        {/* Internal Vault Modal - Rendered inside fullScreen portal to ensure it appears on TOP */}
-        {vaultModalProps && (
-          <VaultRequiredModal
-            {...vaultModalProps}
-            theme={theme}
-          />
-        )}
 
         {/* Upload Progress Popup - Rendered inside modal so it's visible above overlay */}
         <UploadProgressPopup
