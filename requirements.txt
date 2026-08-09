@@ -127,15 +127,21 @@ apscheduler>=3.10.0,<4.0.0
 docker
 
 # Shared service utils (tracing, circuit breaker, request-id propagation).
--e ../citra-service-utils
+#
+# Relative to this repo's root (citra-decks/citra-*), NOT one level up —
+# these six packages are vendored INSIDE this repo, unlike the private
+# monorepo this was cut from, where Citra-Service and citra-X were sibling
+# directories under a shared parent. `-e ../citra-X` fails the Docker build
+# (citra-X doesn't exist above /app) and silently resolves to the wrong
+# on-disk package for local pip installs run from this directory.
+-e ./citra-service-utils
 
 # Shared platform libs (replace the old in-tree auth_middleware.py,
 # mongodb_manager.py, services/worker_queue.py). Citra-Service used to
-# also depend on -e ../citra-workflow; that's GONE as part of the
-# Phase J split — citra-workflow now runs as its own service, reached
-# over HTTP via WORKFLOW_SERVICE_URL.
--e ../citra-queue
--e ../citra-auth
--e ../citra-mongo
--e ../citra-cache
--e ../citra-llm
+# also depend on -e ../citra-workflow; that's GONE — citra-workflow is a
+# separate service not vendored into this repo at all.
+-e ./citra-queue
+-e ./citra-auth
+-e ./citra-mongo
+-e ./citra-cache
+-e ./citra-llm

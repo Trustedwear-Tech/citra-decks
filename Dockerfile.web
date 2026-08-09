@@ -1,0 +1,39 @@
+# Dockerfile.web — builds the citra-decks shell (LandingScreen, composers)
+# as a static Expo web export and serves it.
+#
+# Build-time API URL is baked into the JS bundle (Expo web has no runtime env
+# injection) — pass it explicitly:
+#   docker build -f Dockerfile.web --build-arg CITRA_DECKS_API_URL=https://api.example.com -t citra-decks-web .
+
+FROM node:20-slim AS build
+
+ARG CITRA_DECKS_API_URL=http://localhost:8085
+ENV EXPO_PUBLIC_CITRA_DECKS_API_URL=${CITRA_DECKS_API_URL}
+ENV EXPO_PUBLIC_ENVIRONMENT=production
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY app.json babel.config.js index.js App.js ErrorBoundary.js ./
+COPY assets ./assets
+COPY components ./components
+COPY config ./config
+COPY contexts ./contexts
+COPY hooks ./hooks
+COPY screens ./screens
+COPY services ./services
+COPY ui ./ui
+COPY utils ./utils
+
+RUN npx expo export --platform web
+
+FROM node:20-slim
+RUN npm install -g serve
+WORKDIR /app
+COPY --from=build /app/dist ./dist
+EXPOSE 8081
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=5 \
+    CMD node -e "require('http').get('http://127.0.0.1:8081', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+CMD ["serve", "-s", "dist", "-l", "8081"]

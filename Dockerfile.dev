@@ -26,20 +26,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy requirements first
-COPY Citra-Service/requirements.txt /app/Citra-Service/requirements.txt
+COPY requirements.txt /app/requirements.txt
 
-# Copy editable dependency packages (must match `-e ../citra-X` in requirements.txt:
-#   citra-service-utils, citra-queue, citra-auth, citra-mongo, citra-cache)
+# Copy editable dependency packages (must match `-e ./citra-X` in requirements.txt:
+#   citra-service-utils, citra-auth, citra-mongo, citra-cache, citra-queue, citra-llm)
 COPY citra-service-utils /app/citra-service-utils
-COPY citra-workflow /app/citra-workflow
-COPY citra-queue /app/citra-queue
 COPY citra-auth /app/citra-auth
 COPY citra-mongo /app/citra-mongo
 COPY citra-cache /app/citra-cache
+COPY citra-queue /app/citra-queue
 COPY citra-llm /app/citra-llm
-
-# Switch into service dir
-WORKDIR /app/Citra-Service
 
 # Install deps
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -47,7 +43,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
 
 # Copy service source LAST for caching
-COPY Citra-Service /app/Citra-Service
+COPY . /app
 
 RUN mkdir -p /app/logs
 

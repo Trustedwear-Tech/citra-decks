@@ -1,0 +1,316 @@
+# ─────────────────────────────────────────────────────────────────────────
+# citra-decks — single-command local stack.
+#
+#   cp .env.example .env    # then set an LLM_LARGE_API_KEY (OpenRouter etc.)
+#   make install             # data stores -> backend -> collaboration -> web
+#
+# Mongo/Milvus/MinIO service definitions below are carried over from
+# citra-decision-system's docker-compose.infra.yml (the same gotchas apply:
+# replica-set keyfile generation, Milvus's etcd+minio dependency, MinIO's
+# host.docker.internal reachability requirement) — battle-tested there,
+# reused verbatim except queue-redis and Postgres are dropped: citra-decks
+# doesn't import citra_queue anywhere (confirmed by repo-wide grep), and has
+# no system-of-record demo needing its own database.
+# ─────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── MongoDB — single-node replica set (retryable writes + change streams
+  #    need one, same as Atlas). ────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: citra-decks-mongodb
+    restart: unless-stopped
+    # Auth + --replSet requires a keyfile for member-to-member auth, even with
+    # one member. Generated on first boot into its own volume, never committed.
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -eo pipefail
+        KEYFILE=/etc/mongo-keyfile/keyfile
+        if [ ! -s "$$KEYFILE" ]; then
+          echo "[init] generating replica-set keyfile"
+          openssl rand -base64 756 > "$$KEYFILE"
+        fi
+        chown 999:999 "$$KEYFILE"
+        chmod 400 "$$KEYFILE"
+        exec /usr/local/bin/docker-entrypoint.sh "$$@"
+      - --
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --keyFile
+      - /etc/mongo-keyfile/keyfile
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:?MONGODB_PASSWORD must be set}
+    ports:
+      - "${MONGODB_BIND:-127.0.0.1}:${MONGODB_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_keyfile:/etc/mongo-keyfile
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - citra-decks-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # One-shot: initiate the replica set, then exit 0. Idempotent.
+  mongodb-init-rs:
+    image: mongo:7.0
+    container_name: citra-decks-mongodb-init-rs
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_USER: ${MONGODB_USER:-root}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:?MONGODB_PASSWORD must be set}
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -eo pipefail
+        mongosh --host mongodb --port 27017 \
+          -u "$$MONGODB_USER" -p "$$MONGODB_PASSWORD" \
+          --authenticationDatabase admin --quiet --eval '
+            try {
+              print("replica set already initialised, myState=" + rs.status().myState);
+            } catch (e) {
+              if (e.codeName !== "NotYetInitialized") { throw e; }
+              print("initiating rs0 ...");
+              print("rs.initiate ok=" + rs.initiate({
+                _id: "rs0",
+                members: [{ _id: 0, host: "mongodb:27017" }]
+              }).ok);
+            }
+          '
+    networks:
+      - citra-decks-network
+
+  # ── Redis — backs citra-cache's rate limiter. ───────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: citra-decks-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_BIND:-127.0.0.1}:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - citra-decks-network
+
+  # ── etcd (Milvus metadata storage) ──────────────────────────────────────
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: citra-decks-milvus-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: >
+      etcd --advertise-client-urls=http://milvus-etcd:2379 --listen-client-urls=http://0.0.0.0:2379 --data-dir=/etcd
+    volumes:
+      - milvus_etcd_data:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - citra-decks-network
+
+  # ── MinIO — Milvus's own object storage (separate from the app bucket
+  #    below; credentials must match MILVUS_MINIO_* on both sides). ───────
+  milvus-minio:
+    image: minio/minio:RELEASE.2024-09-22T00-33-43Z
+    container_name: citra-decks-milvus-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MILVUS_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MILVUS_MINIO_SECRET_KEY:-minioadmin}
+    command: minio server /data --console-address ":9001"
+    volumes:
+      - milvus_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - citra-decks-network
+
+  # ── Milvus — vector database (standalone mode). Used for RAG retrieval
+  #    grounding presentation/report/printable generation. ────────────────
+  milvus:
+    image: milvusdb/milvus:v2.5.4
+    container_name: citra-decks-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+      MINIO_ACCESS_KEY_ID: ${MILVUS_MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_ACCESS_KEY: ${MILVUS_MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      # Not loopback: containers reach it at host.docker.internal:19530.
+      - "${MILVUS_BIND:-0.0.0.0}:19530:19530"
+      - "${MILVUS_BIND:-0.0.0.0}:9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+      milvus-minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9091/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - citra-decks-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── MinIO — application file storage (composer thumbnails/images, S3-
+  #    compatible; replaces AWS S3 for local/self-hosted deployments). ────
+  minio:
+    image: minio/minio:RELEASE.2024-09-22T00-33-43Z
+    container_name: citra-decks-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${BUCKET_ACCESS_KEY:?BUCKET_ACCESS_KEY must be set}
+      MINIO_ROOT_PASSWORD: ${BUCKET_SECRET_KEY:?BUCKET_SECRET_KEY must be set}
+    command: minio server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - citra-decks-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── citra-decks backend — composers, folder API, local auth. ────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: citra-decks-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MONGODB_CONN_STRING=mongodb://${MONGODB_USER:-root}:${MONGODB_PASSWORD}@mongodb:27017/?authSource=admin&replicaSet=rs0
+      - MILVUS_URI=http://milvus:19530
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BUCKET_ENDPOINT_URL=http://minio:9000
+    ports:
+      - "8085:7001"
+    depends_on:
+      mongodb-init-rs:
+        condition: service_completed_successfully
+      milvus:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    networks:
+      - citra-decks-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── Real-time collaboration server (Yjs + WebSocket). ───────────────────
+  collaboration-server:
+    build:
+      context: ./collaboration-server
+    container_name: citra-decks-collaboration
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=1234
+      - COLLABORATION_ENABLED=${COLLABORATION_ENABLED:-true}
+      - AUTH_SERVICE_URL=http://backend:7001
+    ports:
+      - "1234:1234"
+    volumes:
+      - collaboration_data:/app/y-leveldb-storage
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:1234/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - citra-decks-network
+
+  # ── Web shell (Presentation/Report/Printable + landing page). ───────────
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        CITRA_DECKS_API_URL: ${CITRA_DECKS_PUBLIC_API_URL:-http://localhost:8085}
+    container_name: citra-decks-web
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - citra-decks-network
+
+volumes:
+  mongodb_data:
+  mongodb_keyfile:
+  redis_data:
+  milvus_etcd_data:
+  milvus_minio_data:
+  milvus_data:
+  minio_data:
+  collaboration_data:
+
+networks:
+  citra-decks-network:
+    name: citra-decks-network
+    driver: bridge
