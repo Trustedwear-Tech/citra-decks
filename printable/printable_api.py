@@ -1182,7 +1182,7 @@ class SaveprintableRequest(BaseModel):
     team_id: Optional[str] = Field(default=None, description="Team/Workspace ID (null for personal workspace)")
     printable_type: str = Field(default="informative", description="printable type")
     thumbnail: Optional[str] = Field(default=None, description="Thumbnail image (base64 or URL)")
-    folder_ids: Optional[List[str]] = Field(default=None, description="Vault folder IDs used during generation")
+    folder_id: Optional[str] = Field(default=None, description="Printable's dedicated folder (one per artifact)")
 # ... (previous models)
 
 class BatchGeneratePAGESRequest(BaseModel):
@@ -4505,7 +4505,7 @@ async def save_printable(http_request: Request, body: SaveprintableRequest):
             "owner_id": _personal_sa_id,
             "org_id": _owner_org_id or None,
             "thumbnail": thumbnail_url,
-            "folder_ids": body.folder_ids,
+            "folder_id": body.folder_id,
             "updated_at": datetime.utcnow()
         }
         

@@ -1449,7 +1449,7 @@ class SavePresentationRequest(BaseModel):
     team_id: Optional[str] = Field(default=None, description="Team/Workspace ID (null for personal workspace)")
     presentation_type: str = Field(default="informative", description="Presentation type")
     thumbnail: Optional[str] = Field(default=None, description="Thumbnail image (base64 or URL)")
-    folder_ids: Optional[List[str]] = Field(default=None, description="Vault folder IDs used during generation")
+    folder_id: Optional[str] = Field(default=None, description="Presentation's dedicated folder (one per artifact)")
 # ... (previous models)
 
 class BatchGenerateSlidesRequest(BaseModel):
@@ -5022,7 +5022,7 @@ async def save_presentation(http_request: Request, body: SavePresentationRequest
             "owner_id": _personal_sa_id,
             "org_id": _owner_org_id or None,
             "thumbnail": thumbnail_url,
-            "folder_ids": body.folder_ids,
+            "folder_id": body.folder_id,
             "updated_at": datetime.utcnow()
         }
         

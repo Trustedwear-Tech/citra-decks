@@ -49,6 +49,7 @@ class ReportCreate(BaseModel):
     pages: List[Dict[str, Any]] = []
     metadata: Dict[str, Any] = {}
     thumbnail: Optional[str] = None  # Base64 or URL for report thumbnail
+    folder_id: Optional[str] = None  # Report's dedicated folder (one per artifact)
 
 
 class ReportUpdate(BaseModel):
@@ -58,6 +59,7 @@ class ReportUpdate(BaseModel):
     pages: Optional[List[Dict[str, Any]]] = None
     metadata: Optional[Dict[str, Any]] = None
     thumbnail: Optional[str] = None  # Base64 or URL for report thumbnail
+    folder_id: Optional[str] = None  # Report's dedicated folder (one per artifact)
 
 
 def serialize_report(report: dict) -> dict:
@@ -135,10 +137,11 @@ async def create_report(http_request: Request, payload: ReportCreate):
             "owner_id": _personal_sa_id,
             "org_id": _owner_org_id or None,
             "thumbnail": thumbnail_url,
+            "folder_id": payload.folder_id,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
-        
+
         report_doc["_id"] = new_id
 
         # Process images (Extract Base64 -> S3) - Use authenticated user
@@ -458,7 +461,9 @@ async def update_report(report_id: str, payload: ReportUpdate, request: Request)
             update_doc["pages"] = payload.pages
         if payload.metadata is not None:
             update_doc["metadata"] = payload.metadata
-        
+        if payload.folder_id is not None:
+            update_doc["folder_id"] = payload.folder_id
+
         # Process thumbnail if provided
         if payload.thumbnail is not None:
             if report_owner:
