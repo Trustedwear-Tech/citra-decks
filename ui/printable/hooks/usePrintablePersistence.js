@@ -1,7 +1,6 @@
 // useprintablePersistence.js - Hook for saving and loading printables
 import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTeam } from '../../../contexts/TeamContext';
 
 const STORAGE_KEYS = {
   printableS: '@citra_ai_printables',
@@ -18,8 +17,8 @@ export const usePrintablePersistence = () => {
 
   const autoSaveTimeoutRef = useRef(null);
   
-  // Get team context for workspace filtering
-  const { activeTeamId } = useTeam();
+  // Teams removed — every artifact lives in the personal workspace.
+  const activeTeamId = null;
 
   // Save printable to local storage
   const saveprintable = useCallback(async (printableData, printableId = null) => {

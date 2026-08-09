@@ -1,7 +1,6 @@
 // usePresentationPersistence.js - Hook for saving and loading presentations
 import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTeam } from '../../../contexts/TeamContext';
 
 const STORAGE_KEYS = {
   PRESENTATIONS: '@citra_ai_presentations',
@@ -18,8 +17,8 @@ export const usePresentationPersistence = () => {
 
   const autoSaveTimeoutRef = useRef(null);
   
-  // Get team context for workspace filtering
-  const { activeTeamId } = useTeam();
+  // Teams removed — every artifact lives in the personal workspace.
+  const activeTeamId = null;
 
   // Save presentation to local storage
   const savePresentation = useCallback(async (presentationData, presentationId = null) => {

@@ -17,7 +17,6 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LazyThumbnail from '../ui/LazyThumbnail';
-import { useTeam } from '../../contexts/TeamContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,8 +48,8 @@ const ReportListModal = ({
     const [screenDimensions, setScreenDimensions] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
     const isMobile = screenDimensions.width < 768;
 
-    // Get team context for workspace filtering
-    const { activeTeamId, isPersonalWorkspace } = useTeam();
+    // Teams removed — every artifact lives in the personal workspace.
+    const activeTeamId = null;
 
     // Update dimensions on resize (for web)
     useEffect(() => {

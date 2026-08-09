@@ -1,7 +1,6 @@
 // useReportPersistence.js - Hook for saving and loading reports
 import { useState, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTeam } from '../../../contexts/TeamContext';
 
 const STORAGE_KEYS = {
   REPORTS: '@citra_ai_reports',
@@ -17,8 +16,8 @@ export const useReportPersistence = () => {
 
   const autoSaveTimeoutRef = useRef(null);
   
-  // Get team context for workspace filtering
-  const { activeTeamId } = useTeam();
+  // Teams removed — every artifact lives in the personal workspace.
+  const activeTeamId = null;
 
   // Save report to local storage
   const saveReport = useCallback(async (reportData, reportId = null) => {

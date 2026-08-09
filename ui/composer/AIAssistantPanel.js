@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { ModernQueryToggles } from '../ui/ModernInteractionComponents';
 import authService from '../../services/authService';
 
 const AIAssistantPanel = ({
