@@ -419,10 +419,7 @@ const PresentationListModal = ({
                     borderColor: safeTheme.primary,
                 }
             ]}
-            onPress={() => {
-                onCreateNew();
-                onClose();
-            }}
+            onPress={onCreateNew}
             activeOpacity={0.8}
         >
             <View style={[styles.cardThumbnail, styles.createNewThumbnail, { height: thumbnailHeight, backgroundColor: safeTheme.primary + '10' }]}>

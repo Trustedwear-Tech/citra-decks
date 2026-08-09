@@ -27,7 +27,7 @@ const isProduction = environment === 'production';
 
 // Single backend — same origin serves the composers, folders, and local auth.
 const BASE_URL = process.env.EXPO_PUBLIC_CITRA_DECKS_API_URL
-  || (isDevelopment ? 'http://localhost:8085' : '');
+  || (isDevelopment ? 'http://localhost:8093' : '');
 
 if (isProduction && !process.env.EXPO_PUBLIC_CITRA_DECKS_API_URL) {
   console.warn('⚠️ [CONFIG] EXPO_PUBLIC_CITRA_DECKS_API_URL is not set in a production build — API calls will fail.');

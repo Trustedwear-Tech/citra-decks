@@ -624,10 +624,10 @@ _cors_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
 _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()] if _cors_env else []
 if not _is_production:
     _dev_origins = [
-        "http://localhost:8081",
-        "http://localhost:8085",
-        "http://127.0.0.1:8081",
-        "http://127.0.0.1:8085",
+        "http://localhost:8093",
+        "http://localhost:8094",
+        "http://127.0.0.1:8093",
+        "http://127.0.0.1:8094",
     ]
     for o in _dev_origins:
         if o not in _cors_origins:
