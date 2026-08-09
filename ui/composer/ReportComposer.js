@@ -46,7 +46,7 @@ import CollaborationLockIndicator from './CollaborationLockIndicator'; // Import
 import UpdateInstructionModal from './UpdateInstructionModal'; // Imported
 import EditSlideOutlineModal from './EditSlideOutlineModal'; // Edit single section topic/outline
 import { useCollaboration } from './hooks/useCollaboration'; // New Import
-import LLMImageService from '../../services/LLMImageService'; // LLM Image Generation Service
+import ImageGenService from '../../services/ImageGenService'; // Image Generation Service (LLMImageService's backend, /llm-image/*, doesn't exist in citra-decks — this is the one working image-gen path, see call site below)
 import Tooltip from '../ui/Tooltip'; // Import Tooltip
 import { showDesktopEditingAlert } from '../../utils/mobileEditAlert';
 import globalImageCache from '../../utils/globalImageCache'; // Image blob cache for reliable rendering
@@ -2411,7 +2411,7 @@ const ReportComposer = ({
 
             try {
               // Generate the image using LLM Image Service
-              const imageResponse = await LLMImageService.generateImage(data.image_prompt, {
+              const imageResponse = await ImageGenService.generateImage(data.image_prompt, {
                 width: 1024,
                 height: 1024,
               });

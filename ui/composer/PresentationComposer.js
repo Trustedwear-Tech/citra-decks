@@ -38,7 +38,6 @@ import { processSlide, processSlideAsync } from './utils/slidePostProcessor';
 import { mapIconToPathAsync } from './utils/iconMapper';
 import { navigateToPresentation } from '../../utils/urlRouter';
 import ImageGenService from '../../services/ImageGenService';
-import LLMImageService from '../../services/LLMImageService';
 import globalImageCache from '../../utils/globalImageCache';
 import { generateImagesParallel } from '../../services/imageGenerationUtils';
 import { prefetchIcons } from './utils/iconMapper';

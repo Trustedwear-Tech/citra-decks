@@ -39,7 +39,6 @@ import { processPage as processPAGE, processPageAsync as processPAGEAsync } from
 import { mapIconToPathAsync } from '../composer/utils/iconMapper';
 import { navigateToPrintable } from '../../utils/urlRouter';
 import ImageGenService from '../../services/ImageGenService';
-import LLMImageService from '../../services/LLMImageService';
 import globalImageCache from '../../utils/globalImageCache';
 import { generateImagesParallel } from '../../services/imageGenerationUtils';
 import { prefetchIcons } from '../composer/utils/iconMapper';
