@@ -15,7 +15,6 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import globalImageCache from '../../utils/globalImageCache';
 import { generateReportHTML } from './utils/generateReportHTML';
-import BrandingUpsellBanner from '../BrandingUpsellBanner';
 
 
 const ExportModal = ({
@@ -478,12 +477,6 @@ ${page.content || ''}
 
             {/* Export Formats */}
             <View style={styles.formatsContainer}>
-              <BrandingUpsellBanner
-                userType={userType}
-                context="export"
-                onUpgrade={onOpenCredits}
-                theme={theme}
-              />
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Choose Export Format
               </Text>

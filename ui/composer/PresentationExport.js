@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { mapIconToPathAsync, prefetchIcons, cacheIconSVG } from './utils/iconMapper';
 import { rasterizeSvgToPng, prerasterizeSvgDiagrams } from './utils/svgRasterize';
 import globalImageCache from '../../utils/globalImageCache';
-import BrandingUpsellBanner from '../BrandingUpsellBanner';
 
 /**
  * PresentationExport - Export presentation to various formats
@@ -1198,14 +1197,6 @@ const PresentationExport = ({
                 </Text>
               </View>
             </View>
-
-            {/* Branding upsell for free users */}
-            <BrandingUpsellBanner
-              userType={userType}
-              context="export"
-              onUpgrade={onOpenCredits}
-              theme={theme}
-            />
 
             {/* Export options */}
             {exportOptions.map((option) => (
