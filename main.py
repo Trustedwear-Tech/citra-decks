@@ -171,6 +171,11 @@ except ImportError as e:
 # auto-created by the shell — no manual folder browsing/CRUD UI anymore).
 from folder_management import router as folder_management_router
 
+# LOCAL AUTH: citra-decks has no separate user-service — this is the
+# register/login/forgot-password issuer the shell's EmailAuthScreen calls,
+# minting JWTs the JWTAuthMiddleware below verifies.
+from api.local_auth import router as local_auth_router
+
 # CHUNKED DOCUMENTS: Large document handling with pagination — document_manager.py
 # (composer ingestion) depends on this.
 try:
@@ -598,6 +603,7 @@ try:
             "/citra-ai/s/",                         # same, behind /citra-ai path prefix
             "/api/public-share/public/",            # public share render API
             "/citra-ai/api/public-share/public/",   # same, behind /citra-ai path prefix
+            "/api/auth/local/",                     # register/login/forgot-password — these MINT tokens, can't require one
         ],
     )
     logger.info("?? JWT Authentication Middleware registered successfully")
@@ -664,6 +670,7 @@ if IMAGE_GEN_AVAILABLE:
 app.include_router(persona_router, prefix="", tags=["Persona"])
 app.include_router(bucket_router, prefix="", tags=["S3 Storage"])
 app.include_router(folder_management_router, prefix="", tags=["Folder Management"])
+app.include_router(local_auth_router, prefix="", tags=["Local Auth"])
 
 # Prometheus /metrics endpoint — public (allow-listed in JWTAuthMiddleware).
 try:

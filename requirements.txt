@@ -111,6 +111,7 @@ dateparser
 python-dateutil
 python-dotenv
 PyJWT
+bcrypt
 tenacity
 slowapi>=0.1.9
 
