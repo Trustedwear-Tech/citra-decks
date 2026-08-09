@@ -44,10 +44,16 @@ Once it's up:
 
 | Service | URL |
 |---|---|
-| Web UI (Presentation / Visual Report / MS-Word Report) | http://localhost:8081 |
-| Backend API (docs at `/docs`) | http://localhost:8085 |
+| Web UI (Presentation / Visual Report / MS-Word Report) | http://localhost:8094 |
+| Backend API (docs at `/docs`) | http://localhost:8093 |
 | Real-time collaboration (Yjs/WebSocket) | ws://localhost:1234 |
 | MinIO console | http://localhost:9003 |
+
+Ports deliberately avoid the conventional 8081/8085/27017/19530/6379 —
+citra-decks can run alongside another Citra product's stack on the same
+machine without a port collision. Override any of them via `.env`
+(`BACKEND_HOST_PORT`, `WEB_HOST_PORT`, `MONGODB_PORT`, `MILVUS_PORT`,
+`MILVUS_METRICS_PORT`, `REDIS_HOST_PORT`) if you'd rather use the defaults.
 
 There is no seeded account — register your first user from the web UI's sign-up
 screen. `api/local_auth.py` issues its own JWTs (bcrypt-hashed passwords, a

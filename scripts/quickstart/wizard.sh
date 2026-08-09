@@ -105,5 +105,5 @@ if yes_no "Start all services?" "y"; then
 fi
 
 hr
-echo "$(b "Done.")  Open  http://localhost:8081  and create your first account."
+echo "$(b "Done.")  Open  http://localhost:8094  and create your first account."
 echo "Re-run this wizard any time to change keys:  ./scripts/quickstart/wizard.sh"

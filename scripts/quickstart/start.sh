@@ -33,14 +33,14 @@ $COMPOSE up -d --build
 echo -n "-> waiting for backend "
 BACKEND_OK=false
 for _ in $(seq 1 60); do
-  if curl -fsS "http://localhost:8085/health" >/dev/null 2>&1; then
+  if curl -fsS "http://localhost:8093/health" >/dev/null 2>&1; then
     echo " OK"; BACKEND_OK=true; break
   fi
   printf "."; sleep 5
 done
 if [ "$BACKEND_OK" != true ]; then
   echo " TIMEOUT"
-  echo "   backend not healthy at http://localhost:8085/health — check: $COMPOSE logs backend" >&2
+  echo "   backend not healthy at http://localhost:8093/health — check: $COMPOSE logs backend" >&2
   exit 1
 fi
 
@@ -66,8 +66,8 @@ cat <<EOF
 ----------------------------------------------------------------------------
 citra-decks is running.
 
-   Web UI          http://localhost:8081
-   Backend API     http://localhost:8085  (docs: /docs)
+   Web UI          http://localhost:8094
+   Backend API     http://localhost:8093  (docs: /docs)
    Collaboration   ws://localhost:1234    (health: /health)
    MinIO console   http://localhost:9003
 

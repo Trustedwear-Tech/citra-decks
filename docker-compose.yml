@@ -47,7 +47,9 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-root}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:?MONGODB_PASSWORD must be set}
     ports:
-      - "${MONGODB_BIND:-127.0.0.1}:${MONGODB_PORT:-27017}:27017"
+      # 27018, not Mongo's conventional 27017 — leaves room for another
+      # Citra product's compose stack to run on the same host at once.
+      - "${MONGODB_BIND:-127.0.0.1}:${MONGODB_PORT:-27018}:27017"
     volumes:
       - mongodb_data:/data/db
       - mongodb_keyfile:/etc/mongo-keyfile
@@ -95,14 +97,18 @@ services:
     networks:
       - citra-decks-network
 
-  # ── Redis — backs citra-cache's rate limiter. ───────────────────────────
+  # ── Redis — backs citra-cache's rate limiter. Host port is configurable
+  #    (default 6382, not 6379) so this stack can run alongside another
+  #    Citra product's compose stack on the same machine without a port
+  #    collision — containers still reach it in-network as redis:6379
+  #    regardless of what's published to the host. ─────────────────────────
   redis:
     image: redis:7-alpine
     container_name: citra-decks-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_BIND:-127.0.0.1}:6379:6379"
+      - "${REDIS_BIND:-127.0.0.1}:${REDIS_HOST_PORT:-6382}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -171,9 +177,11 @@ services:
       MINIO_ACCESS_KEY_ID: ${MILVUS_MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_ACCESS_KEY: ${MILVUS_MINIO_SECRET_KEY:-minioadmin}
     ports:
-      # Not loopback: containers reach it at host.docker.internal:19530.
-      - "${MILVUS_BIND:-0.0.0.0}:19530:19530"
-      - "${MILVUS_BIND:-0.0.0.0}:9091:9091"
+      # Not loopback: containers reach it at host.docker.internal:19531.
+      # 19531/9092, not Milvus's conventional 19530/9091 — same
+      # multi-product-on-one-host reasoning as Mongo's port above.
+      - "${MILVUS_BIND:-0.0.0.0}:${MILVUS_PORT:-19531}:19530"
+      - "${MILVUS_BIND:-0.0.0.0}:${MILVUS_METRICS_PORT:-9092}:9091"
     volumes:
       - milvus_data:/var/lib/milvus
     depends_on:
@@ -234,7 +242,9 @@ services:
       - REDIS_PORT=6379
       - BUCKET_ENDPOINT_URL=http://minio:9000
     ports:
-      - "8085:7001"
+      # 8093, not the conventional 8085 — see the Mongo/Milvus port comments
+      # above; this whole file avoids the ports other Citra products default to.
+      - "${BACKEND_HOST_PORT:-8093}:7001"
     depends_on:
       mongodb-init-rs:
         condition: service_completed_successfully
@@ -289,11 +299,12 @@ services:
       context: .
       dockerfile: Dockerfile.web
       args:
-        CITRA_DECKS_API_URL: ${CITRA_DECKS_PUBLIC_API_URL:-http://localhost:8085}
+        CITRA_DECKS_API_URL: ${CITRA_DECKS_PUBLIC_API_URL:-http://localhost:8093}
     container_name: citra-decks-web
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      # 8094, not 8081 — same reasoning as the backend's port above.
+      - "${WEB_HOST_PORT:-8094}:8081"
     depends_on:
       backend:
         condition: service_healthy
