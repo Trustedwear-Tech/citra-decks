@@ -22,6 +22,14 @@ env/
 # Environment & Secrets
 # =============================================================================
 
+# Real .env files — never tracked. .env.example is the only version-
+# controlled reference; `make wizard` / scripts/quickstart/setup.sh
+# generate a real .env locally from it on first run. See README.md.
+.env
+.env.local
+.env.*.local
+!.env.example
+
 # GCP / Firebase / Cloud credentials
 *.json
 !package.json
