@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "citra-decks",
+    "slug": "citra-decks",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/citra-logo.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/citra-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0b14"
+    },
+    "web": {
+      "favicon": "./assets/citra-logo.png",
+      "name": "citra-decks",
+      "shortName": "citra-decks",
+      "lang": "en",
+      "scope": "/",
+      "themeColor": "#0a0b14",
+      "backgroundColor": "#0a0b14",
+      "display": "standalone",
+      "orientation": "any",
+      "startUrl": "/",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}

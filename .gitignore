@@ -25,8 +25,17 @@ env/
 # GCP / Firebase / Cloud credentials
 *.json
 !package.json
+!package-lock.json
 !app.json
 !tsconfig.json
+
+# =============================================================================
+# Node / Expo
+# =============================================================================
+node_modules/
+dist/
+.expo/
+web-build/
 
 # AWS credentials
 *.pem
