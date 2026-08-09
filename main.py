@@ -15,7 +15,7 @@ import logging
 # Configure logging to suppress asyncio.CancelledError warnings
 logging.getLogger('asyncio').setLevel(logging.ERROR)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -32,7 +32,8 @@ import httpx
 import ssl
 
 # Import JWT Authentication Middleware
-from citra_auth import JWTAuthMiddleware
+from citra_auth import JWTAuthMiddleware, get_current_user
+from citra_mongo import get_mongo_client, get_database_name
 
 # Import Rate Limiting Middleware
 from middleware.rate_limit_middleware import limiter, CentralRateLimitMiddleware
@@ -128,12 +129,10 @@ class LargeFileMiddleware:
         await self.app(scope, receive, send)
 
 # V1 endpoints removed - using V2 APIs only
+# chat.py / note.py / query.py / audio_to_text_manager.py / dept_library.py /
+# semantic_search_api.py removed — unrelated to the presentation/printable/
+# report composers. See docs (Part B of the OSS cleanup pass).
 from document_manager import router as document_manager_router
-from chat import router as chat_router
-from note import router as note_router
-# Milvus router removed - migrated to Milvus/Zilliz
-from query import router as query_router
-from audio_to_text_manager import router as audio_to_text_manager_router
 from persona import router as persona_router
 from bucket import router as bucket_router
 
@@ -168,53 +167,22 @@ except ImportError as e:
     logger.warning(f"🖼️ Image Generation API not available: {e}")
     IMAGE_GEN_AVAILABLE = False
 
-# CACHE HEALTH: Monitor Redis + Local Cache fallback system
-try:
-    from api.cache_health import router as cache_health_router
-    CACHE_HEALTH_AVAILABLE = True
-    logger.info("?? Cache Health API imported successfully")
-except ImportError as e:
-    logger.warning(f"?? Cache Health API not available: {e}")
-    CACHE_HEALTH_AVAILABLE = False
-
-# FOLDER MANAGEMENT: Folder organization and management endpoints
+# FOLDER MANAGEMENT: trimmed to create+get only (one folder per artifact,
+# auto-created by the shell — no manual folder browsing/CRUD UI anymore).
 from folder_management import router as folder_management_router
 
-# DEPT SOP LIBRARY: department-owned document folders (SOP Library slice 1)
-from dept_library import router as dept_library_router
-
-# SEMANTIC SEARCH: the one platform-side RAG surface (RAG short-circuit #6)
-from semantic_search_api import router as semantic_search_router
-
-# PROJECT MANAGEMENT: Project/Case management with profession-based terminology
-
-# KNOWLEDGE GRAPH: Legal knowledge graph functionality
-try:
-    logger.info("??? Knowledge Graph API imported successfully")
-except ImportError as e:
-    logger.info(f"ℹ️ Knowledge Graph API not available (module removed): {e}")
-
-# SUBSCRIPTION: Subscription and usage tracking endpoints removed for enterprise licensing
-
-# CHUNKED DOCUMENTS: Large document handling with pagination
+# CHUNKED DOCUMENTS: Large document handling with pagination — document_manager.py
+# (composer ingestion) depends on this.
 try:
     from api.chunked_documents import router as chunked_documents_router
     CHUNKED_DOCUMENTS_AVAILABLE = True
-    logger.info("?? Chunked documents API imported successfully")
+    logger.info("📦 Chunked documents API imported successfully")
 except ImportError as e:
-    logger.warning(f"?? Chunked documents API not available: {e}")
+    logger.warning(f"📦 Chunked documents API not available: {e}")
     CHUNKED_DOCUMENTS_AVAILABLE = False
 
-# UNIFIED FOLDER DOCUMENTS: Combined documents API for all document types per folder
-try:
-    from api.unified_folder_documents import router as unified_folder_documents_router
-    UNIFIED_FOLDER_DOCUMENTS_AVAILABLE = True
-    logger.info("??? Unified folder documents API imported successfully")
-except ImportError as e:
-    logger.warning(f"??? Unified folder documents API not available: {e}")
-    UNIFIED_FOLDER_DOCUMENTS_AVAILABLE = False
-
-# FILES: Centralized file metadata tracking and management
+# FILES: Centralized file metadata tracking — the folder-detail popup's file
+# list (GET /api/v2/files?folder_id=X) depends on this.
 try:
     from api.files_api import router as files_router
     FILES_AVAILABLE = True
@@ -223,67 +191,11 @@ except ImportError as e:
     logger.warning(f"📁 Files API not available: {e}")
     FILES_AVAILABLE = False
 
-# DOCUMENT PROXY: Same-origin streaming for document downloads (PDFs)
-try:
-    from api.document_proxy import router as document_proxy_router
-    DOCUMENT_PROXY_AVAILABLE = True
-    logger.info("📄 Document Proxy API imported successfully")
-except ImportError as e:
-    logger.warning(f"📄 Document Proxy API not available: {e}")
-    DOCUMENT_PROXY_AVAILABLE = False
-
-# DRAFT: Document drafting and modification using LLM API
-try:
-    logger.info("📝 Draft API imported successfully")
-except Exception as e:
-    logger.warning(f"📝 Draft API not available: {e}")
-    logger.exception("Full draft import error:")
-
-# PROJECT MANAGEMENT: Project/Case management with AI assistance
-try:
-    logger.info("✅ project_management router imported")
-    logger.info("✅ project_ai_chat router imported")
-    logger.info("✅ resource_management router imported")
-    logger.info("📊 Project Management API imported successfully")
-    logger.info("👥 Resource Management API imported successfully")
-except Exception as e:
-    logger.warning(f"📊 Project/Resource Management API not available: {e}")
-    logger.exception("Full traceback:")
-
-# TEMPLATES: Template management for drafting system
-try:
-    from api.templates import router as templates_router
-    TEMPLATES_AVAILABLE = True
-    logger.info("📄 Templates API imported successfully")
-except Exception as e:
-    logger.warning(f"📄 Templates API not available: {e}")
-    TEMPLATES_AVAILABLE = False
-
-# PAGE BUILDER: AI-powered page builder with enterprise integrations
-try:
-    logger.info("📄 Page Builder API imported successfully")
-except Exception as e:
-    logger.warning(f"📄 Page Builder API not available: {e}")
-    logger.exception("Full page builder import error:")
-
-# ENTERPRISE BRANDING: Enterprise-level branding and admin management
-try:
-    from custom_domain_api import router as custom_domain_router, root_router as custom_domain_root_router, admin_router
-    CUSTOM_DOMAIN_AVAILABLE = True
-    logger.info("🎨 Enterprise Branding API imported successfully")
-except Exception as e:
-    logger.warning(f"🎨 Enterprise Branding API not available: {e}")
-    CUSTOM_DOMAIN_AVAILABLE = False
-
-
-
-# Optional video upload router (requires moviepy)
-try:
-    from video_upload import router as video_upload_router
-    VIDEO_UPLOAD_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Video upload disabled: {e}")
-    VIDEO_UPLOAD_AVAILABLE = False
+# cache_health / unified_folder_documents / document_proxy / draft / templates /
+# page_builder / video_upload removed — unrelated to composers, and several
+# were already no-op stubs (page_builder, project management) before removal.
+# custom_domain_api.py removed too, EXCEPT its two non-branding routes
+# (/s/{share_token}, /api/admin/check), relocated below near /health.
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -459,48 +371,12 @@ async def startup_services():
             logger.warning(f"⚠️ Credit checking may fail until pricing is loaded")
             return False
 
-    async def init_template_service():
-        """Initialize Template Service for document drafting"""
-        try:
-            logger.info("📄 Initializing Template Service...")
-            from api.templates import init_template_service_async
-            from citra_mongo import get_async_mongo_client, MONGODB_DATABASE
-            
-            # Initialize template service with async MongoDB client
-            async_mongo_client = get_async_mongo_client()
-            await init_template_service_async(async_mongo_client, MONGODB_DATABASE)
-            
-            logger.info("✅ Template Service initialized successfully")
-            return True
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Template Service initialization failed: {e}")
-            logger.warning(f"⚠️ Template upload and management will not be available")
-            return False
-
-    async def init_vault_sharing_service():
-        """Initialize Vault Sharing Service for sharing vaults with other users"""
-        try:
-            logger.info("🔗 Initializing Vault Sharing Service...")
-            from api.vault_sharing import initialize_vault_sharing_service
-            from citra_mongo import get_async_mongo_client, MONGODB_DATABASE
-            
-            # Initialize vault sharing service with async MongoDB client
-            async_mongo_client = get_async_mongo_client()
-            initialize_vault_sharing_service(async_mongo_client, MONGODB_DATABASE)
-            
-            # Create indexes for vault sharing collection
-            from services.vault_sharing_service import get_vault_sharing_service
-            sharing_service = get_vault_sharing_service(async_mongo_client, MONGODB_DATABASE)
-            await sharing_service.ensure_indexes()
-            
-            logger.info("✅ Vault Sharing Service initialized successfully")
-            return True
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Vault Sharing Service initialization failed: {e}")
-            logger.warning(f"⚠️ Vault sharing functionality will not be available")
-            return False
+    # init_template_service / init_vault_sharing_service removed — both
+    # imported from files deleted in this pass (api/templates.py,
+    # api/vault_sharing.py, services/vault_sharing_service.py). Same leftover
+    # class found and fixed in the sibling Citra-Service cleanup: try/excepted,
+    # so it never crashed the app, only caught at runtime when actually
+    # awaited — invisible to a module-level boot test.
 
     async def init_authorization_service():
         """Initialize Centralized Authorization Service"""
@@ -538,8 +414,6 @@ async def startup_services():
         # init_workflows() removed — workflows live in citra-workflow service.
         init_cache(),
         init_usage_manager(),
-        init_template_service(),
-        init_vault_sharing_service(),
         init_authorization_service(),
         return_exceptions=True
     )
@@ -760,10 +634,6 @@ app.add_middleware(
 
 # Include routers with V2 API endpoints only (no prefix changes to maintain compatibility)
 app.include_router(document_manager_router, prefix="", tags=["Document Management"])
-app.include_router(chat_router, prefix="", tags=["Chat"])
-app.include_router(note_router, prefix="", tags=["Note"])
-# Milvus router removed - migrated to Milvus/Zilliz
-app.include_router(query_router, prefix="", tags=["Query"])
 app.include_router(composer_query_router, prefix="", tags=["Composer"])
 app.include_router(composer_context_router, prefix="", tags=["Composer Context"])
 
@@ -791,12 +661,9 @@ if IMAGE_GEN_AVAILABLE:
     app.include_router(image_gen_router, prefix="", tags=["Image Generation"])
     logger.info("🎨 Image Generation API registered successfully")
 
-app.include_router(audio_to_text_manager_router, prefix="", tags=["Audio"])
 app.include_router(persona_router, prefix="", tags=["Persona"])
 app.include_router(bucket_router, prefix="", tags=["S3 Storage"])
 app.include_router(folder_management_router, prefix="", tags=["Folder Management"])
-app.include_router(dept_library_router, prefix="", tags=["Dept SOP Library"])
-app.include_router(semantic_search_router, prefix="", tags=["Semantic Search"])
 
 # Prometheus /metrics endpoint — public (allow-listed in JWTAuthMiddleware).
 try:
@@ -809,33 +676,11 @@ except Exception as _e:
 # SSE Credit Alerts removed — license model, no credit enforcement
 
 # Error Report — UI crash reports emailed to support
-try:
-    from api.error_report import router as error_report_router
-    app.include_router(error_report_router, prefix="", tags=["Error Report"])
-    logger.info("🐛 Error Report endpoint registered")
-except Exception as e:
-    logger.warning(f"🐛 Error Report not available: {e}")
-# Usage tracking and subscription endpoints removed for enterprise licensing
-
-# Only include Knowledge Graph router if available
-# Only include Cache Health router if available
-if CACHE_HEALTH_AVAILABLE:
-    app.include_router(cache_health_router, prefix="", tags=["Cache Health"])
-    logger.info("🔍 Cache Health API registered")
-
-# Only include Draft router if available
-# Only include Templates router if available
-if TEMPLATES_AVAILABLE:
-    app.include_router(templates_router, prefix="", tags=["Templates"])
-    logger.info("📄 Templates API registered")
-
-# Only include Page Builder router if available
-# Only include Custom Domain router if available
-if CUSTOM_DOMAIN_AVAILABLE:
-    app.include_router(custom_domain_router, prefix="", tags=["Enterprise Branding"])
-    app.include_router(custom_domain_root_router, prefix="", tags=["Share Routes"])
-    app.include_router(admin_router, prefix="", tags=["Admin"])
-    logger.info("🎨 Enterprise Branding API registered")
+# error_report / cache_health / templates / custom_domain (branding+admin
+# halves) / vault_sharing / sharing / gdpr_delete / entity extraction /
+# diagram generation removed — unrelated to composers. custom_domain_api.py's
+# two non-branding routes (/s/{share_token}, /api/admin/check) are relocated
+# near /health below, not deleted — see the comment there.
 
 # Internal code-exec route (consumed by smart-app-service runtime for
 # tools_v2 kind=code_exec). Reuses the quick-chat sandbox pool. Auth
@@ -846,52 +691,6 @@ try:
     logger.info("🐍 Internal Code Exec API registered")
 except Exception as exc:  # noqa: BLE001
     logger.warning(f"⚠️ Code Exec router not registered: {exc}")
-
-# ENTERPRISE ENTITIES: Enterprise feature has been removed
-# Enterprise entity search and management is deprecated
-# try:
-#     from api.enterprise_entities import router as enterprise_entities_router
-#     app.include_router(enterprise_entities_router, prefix="", tags=["Enterprise Entities"])
-#     logger.info("?? Enterprise entities API registered successfully")
-# except ImportError as e:
-#     logger.warning(f"?? Enterprise entities API not available: {e}")
-logger.info("⏭️ Enterprise entities API disabled (feature removed)")
-
-# VAULT SHARING: Share vaults with other users via email
-try:
-    from api.vault_sharing import router as vault_sharing_router
-    app.include_router(vault_sharing_router, prefix="", tags=["Vault Sharing"])
-    logger.info("🔗 Vault Sharing API registered successfully")
-except ImportError as e:
-    logger.warning(f"🔗 Vault Sharing API not available: {e}")
-
-# RESOURCE SHARING: Centralized sharing API for all resource types
-try:
-    from api.sharing import router as sharing_router
-    app.include_router(sharing_router, prefix="", tags=["Resource Sharing"])
-    logger.info("🔗 Resource Sharing API registered successfully")
-except ImportError as e:
-    logger.warning(f"🔗 Resource Sharing API not available: {e}")
-
-# GDPR: Bulk user data deletion endpoint (Article 17 — Right to Erasure)
-try:
-    from api.gdpr_delete import router as gdpr_delete_router
-    app.include_router(gdpr_delete_router, prefix="", tags=["GDPR User Data Deletion"])
-    logger.info("🗑️ GDPR user data deletion API registered successfully")
-except ImportError as e:
-    logger.warning(f"🗑️ GDPR deletion API not available: {e}")
-
-# ENTITY EXTRACTION: Mindmap entity extraction from folders
-try:
-    logger.info("??? Entity extraction API registered successfully")
-except ImportError as e:
-    logger.warning(f"??? Entity extraction API not available: {e}")
-
-# DIAGRAM GENERATION: Legal document diagram generation
-try:
-    logger.info("?? Diagram generation API registered successfully")
-except ImportError as e:
-    logger.warning(f"?? Diagram generation API not available: {e}")
 
 # PUBLIC SHARE: Public shareable links for diagrams, reports, and chats
 try:
@@ -917,76 +716,20 @@ try:
 except Exception as e:
     logger.error(f"📊 Presentation Analytics API not available: {type(e).__name__}: {e}")
 
-# READER: Legal document reader with LLM-extracted metadata
-try:
-    logger.info("?? Document reader API registered successfully")
-except ImportError as e:
-    logger.warning(f"?? Document reader API not available: {e}")
-
-# USAGE TREND: Daily usage statistics from credittransactions
-try:
-    from api.usage_trend import router as usage_trend_router
-    app.include_router(usage_trend_router, prefix="/api/usage", tags=["Usage Tracking"])
-    logger.info("📊 Usage trend API registered successfully")
-except ImportError as e:
-    logger.warning(f"📊 Usage trend API not available: {e}")
+# reader / usage_trend / teams / unified_folder_documents / document_proxy /
+# video_upload / openai_compat / quick_chat removed — unrelated to composers
+# (reader, quick_chat and the "project management" else-branch below were
+# already no-op stubs before removal).
 
 # Only include chunked documents router if available
 if CHUNKED_DOCUMENTS_AVAILABLE:
     app.include_router(chunked_documents_router, prefix="")
     logger.info("📦 Chunked documents API registered")
 
-# TEAM/WORKSPACE MANAGEMENT: Multi-tenant team collaboration
-try:
-    from api.teams import router as teams_router
-    from api.team_invitations import router as team_invitations_router
-    app.include_router(teams_router, tags=["Teams"])
-    app.include_router(team_invitations_router, tags=["Team Invitations"])
-    logger.info("👥 Teams API registered successfully")
-    logger.info("📧 Team Invitations API registered successfully")
-except ImportError as e:
-    logger.warning(f"👥 Teams API not available: {e}")
-
-# Only include unified folder documents router if available
-if UNIFIED_FOLDER_DOCUMENTS_AVAILABLE:
-    app.include_router(unified_folder_documents_router, prefix="")
-    logger.info("??? Unified folder documents API registered")
-
-# Clean architecture: folder routing handled at UI level via FolderContentService
-# No need for unified folder documents API - each API serves its purpose
-
 # Only include files router if available
 if FILES_AVAILABLE:
     app.include_router(files_router, prefix="")
     logger.info("📁 Files API registered")
-
-# Only include document proxy router if available
-if DOCUMENT_PROXY_AVAILABLE:
-    app.include_router(document_proxy_router, prefix="")
-    logger.info("📄 Document Proxy API registered")
-
-# Only include project management routers if available
-else:
-    logger.warning("⚠️ Project Management not available - routers not registered")
-
-# Only include resource management router if available
-# Only include video upload router if available
-if VIDEO_UPLOAD_AVAILABLE:
-    app.include_router(video_upload_router, prefix="", tags=["Video"])
-
-# OPENAI-COMPATIBLE API: Exposes Citra LLM models via /v1/chat/completions
-try:
-    from api.openai_compat import router as openai_compat_router
-    app.include_router(openai_compat_router, prefix="", tags=["OpenAI Compatible"])
-    logger.info("🤖 OpenAI-Compatible API registered (v1/chat/completions, v1/models)")
-except ImportError as e:
-    logger.warning(f"🤖 OpenAI-Compatible API not available: {e}")
-
-# QUICK CHAT: Temporary file-based chat with agentic processing
-try:
-    logger.info("💬 Quick Chat API registered successfully")
-except ImportError as e:
-    logger.warning(f"💬 Quick Chat API not available: {e}")
 
 # ACTION CHAT: now lives in its own service (action-chat-service/) with its
 # own database, bucket, Milvus collection, Redis namespace, and route prefix
@@ -2027,6 +1770,37 @@ Please answer the user's question based on the document content above. Be concis
             "Connection": "keep-alive",
         }
     )
+
+# Relocated from custom_domain_api.py (deleted — enterprise-branding feature
+# removed) when that file's deletion took two routes down with it that were
+# NOT branding-specific: the unified public-share short-link viewer, used by
+# every share type (chat/diagram/report/presentation/printable) and named
+# explicitly in the JWTAuthMiddleware bypass allowlist above, and the generic
+# admin-check. Both keep their exact original paths so nothing else changes.
+@app.get("/s/{share_token}")
+async def unified_public_share(share_token: str, request: Request, embed: bool = False):
+    """Public share route — renders shared content by token."""
+    from fastapi.responses import HTMLResponse
+    from api.public_share import view_public_share, generate_error_html, public_shares_collection
+
+    try:
+        share = public_shares_collection.find_one({"share_token": share_token})
+        if not share:
+            return HTMLResponse(content=generate_error_html("Share Not Found", "This share link is invalid or has been revoked."))
+        rendered_html = await view_public_share(share_token=share_token, embed=embed)
+        return HTMLResponse(content=rendered_html)
+    except Exception as e:
+        logger.error(f"❌ [SHARE] Failed share route: {e}")
+        return HTMLResponse(content=generate_error_html("Error", "An error occurred while loading this content."))
+
+
+@app.get("/api/admin/check")
+def check_admin(current_user: dict = Depends(get_current_user)):
+    """Check if current user is an admin (admins collection, seeded directly in Mongo)."""
+    email = current_user.get("email") or current_user.get("user_id")
+    admins_col = get_mongo_client()[get_database_name()]['admins']
+    return {"is_admin": admins_col.find_one({"email": email}) is not None}
+
 
 # Health check endpoints
 @app.get("/health", operation_id="main_health_check")

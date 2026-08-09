@@ -60,14 +60,10 @@ def test_collection_name_defaults_dept_and_requires_source():
         resolve_semantic_collection("ops", "")
 
 
-def test_dept_libraries_share_one_collection():
-    # BREAKING CHANGE: ALL dept libraries share ONE collection (isolation is by the
-    # scalar-indexed org_id/dept/source_id fields), so the collection name is the
-    # SAME regardless of dept — not a per-dept derived name.
-    from dept_library import dept_library_collection_name
-    from dept_library_store import shared_dept_collection
-    assert dept_library_collection_name("operations") == shared_dept_collection()
-    assert dept_library_collection_name("finance") == dept_library_collection_name("hr")
+# test_dept_libraries_share_one_collection removed — tested dept_library.py,
+# deleted in this pass as unrelated to the presentation/printable/report
+# composers. Nothing else in this file depends on it (semantic_reader.py, the
+# module this file actually tests, is unaffected and stays).
 
 
 # ── filter expression (safe) ─────────────────────────────────────────────────

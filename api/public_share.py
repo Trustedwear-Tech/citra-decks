@@ -1167,15 +1167,11 @@ async def view_public_share(share_token: str, embed: bool = False):
         
         permission = share.get("permission", "read")
         
-        # Fetch Custom Branding if applicable
+        # Custom Branding removed (custom_domain_api.py deleted, feature out of
+        # scope). branding stays None — every render function below already
+        # treats a missing branding value as "use default Citra AI branding."
         user_id = share.get("user_id")
         branding = None
-        if user_id:
-            try:
-                from custom_domain_api import get_branding_for_resource
-                branding = get_branding_for_resource(user_id)
-            except Exception as e:
-                logger.warning(f"Failed to fetch branding for user {user_id}: {e}")
         
         # Build OG meta tags for social previews
         og_image_url = share.get("og_image_url")  # Direct URL (e.g., Citra logo)

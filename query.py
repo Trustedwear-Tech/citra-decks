@@ -126,10 +126,6 @@ from citra_auth import get_secure_user_id, get_user_email
 
 # Credit checking integration for pay-as-you-go billing
 from middleware.credit_check_middleware import check_user_credits
-from credit_integration_wrapper import (
-    check_and_track_query_credits,
-    add_credit_info_to_response
-)
 from middleware import InsufficientCreditsError
 
 # BACKGROUND OPERATION MANAGEMENT SYSTEM
