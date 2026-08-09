@@ -30,7 +30,7 @@ export default function LandingScreen({ onSelectType, theme }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={[styles.title, { color: theme.text }]}>citra-decks</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Citra Decks</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           Choose what you want to create
         </Text>
@@ -56,6 +56,21 @@ export default function LandingScreen({ onSelectType, theme }) {
               </View>
             </TouchableOpacity>
           ))}
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={[styles.footerLine, { color: theme.textSecondary }]}>
+            Citra is a product of Trustedwear Tech Private Limited
+          </Text>
+          <Text style={[styles.footerLine, { color: theme.textSecondary }]}>
+            Founder ex-Microsoft (20+ yrs enterprise software) · Incubated at IIT Patna
+          </Text>
+          <Text style={[styles.footerLine, { color: theme.textSecondary }]}>
+            Funded by Startup India, MeitY &amp; the Government of Bihar
+          </Text>
+          <Text style={[styles.footerContact, { color: theme.textSecondary }]}>
+            Rohit Kumar Chandan · Founder · rohit@citra-ai.com · https://citra-ai.com
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -127,5 +142,21 @@ const styles = StyleSheet.create({
   cardActionText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  footer: {
+    marginTop: 48,
+    alignItems: 'center',
+  },
+  footerLine: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 4,
+    opacity: 0.8,
+  },
+  footerContact: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.8,
   },
 });
