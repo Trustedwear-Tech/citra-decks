@@ -21,9 +21,7 @@ import ImageGenService from '../../services/ImageGenService';
 import globalImageCache from '../../utils/globalImageCache';
 import authService from '../../services/authService';
 import UnifiedUploadModal from '../UnifiedUploadModal'; // Unified upload modal
-import VaultRequiredModal from '../VaultRequiredModal';
 import UploadProgressPopup from '../UploadProgressPopup'; // Upload progress popup for visibility inside modal
-import VaultSelectorChip from '../ui/VaultSelectorChip';
 
 /**
  * Helper function to check if an error/response indicates insufficient credits
@@ -106,13 +104,10 @@ const PresentationGoalInput = ({
   userDeviceId,
   selectedFolders = [],
   folders = [],
-  onSelectFolder,
-  onCreateVault,
   theme,
   persona = null,
   onOpenUploadModal, // DEPRECATED: Not used, we use internal state now
   uploadModalProps, // NEW: Props for internal ChatUniversalUploadModal
-  vaultModalProps, // NEW: Props for internal VaultRequiredModal
   enhancedProgress, // Upload progress for showing popup inside modal
 }) => {
   // Goal validation constants
@@ -155,8 +150,6 @@ const PresentationGoalInput = ({
 
   // Internal modal state
   const [showInternalUploadModal, setShowInternalUploadModal] = useState(false);
-  const [showVaultNeededModal, setShowVaultNeededModal] = useState(false);
-  const [vaultNeededMessage, setVaultNeededMessage] = useState('');
   const [editingSlideId, setEditingSlideId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingContent, setEditingContent] = useState('');
@@ -331,11 +324,12 @@ const PresentationGoalInput = ({
 
   const { useUploadedData, setUseUploadedData } = useWorkspace();
 
-  // Guard: check vault is enabled before allowing features that need it
+  // Guard: check the data-source toggle is on before allowing features that need it.
+  // selectedFolders is always exactly one auto-created folder now, never empty —
+  // the only real gate left is the useUploadedData toggle itself.
   const requireVault = useCallback((featureMessage) => {
     if (!useUploadedData || !selectedFolders || selectedFolders.length === 0) {
-      setVaultNeededMessage(featureMessage);
-      setShowVaultNeededModal(true);
+      Alert.alert('Data Source Required', featureMessage);
       return false;
     }
     return true;
@@ -1109,20 +1103,34 @@ const PresentationGoalInput = ({
           Describe what you want your presentation to achieve. Be specific about the topic, key points, and desired outcome.
         </Text>
 
-        {/* Vault Selector - Prominent vault selection */}
-        <View style={{ marginBottom: 16 }}>
-          <VaultSelectorChip
-            selectedFolders={selectedFolders}
-            folders={folders}
-            onSelectFolder={onSelectFolder}
-            onCreateVault={onCreateVault}
-            theme={theme}
-            label="Data Source"
-            insideModal
-            vaultEnabled={useUploadedData}
-            onToggleVault={setUseUploadedData}
+        {/* Grounding folder — one auto-created folder per presentation, no
+            picker. Toggle controls whether generation draws on its uploaded
+            documents at all. */}
+        <TouchableOpacity
+          onPress={() => setUseUploadedData(!useUploadedData)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: theme.borderColor || theme.textSecondary,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <Ionicons name="folder-outline" size={18} color={theme.primary} />
+            <Text style={{ color: theme.text, marginLeft: 8, flexShrink: 1 }} numberOfLines={1}>
+              {selectedFolders?.[0]?.name || 'Data Source'}
+            </Text>
+          </View>
+          <Ionicons
+            name={useUploadedData ? 'toggle' : 'toggle-outline'}
+            size={28}
+            color={useUploadedData ? theme.primary : theme.textSecondary}
           />
-        </View>
+        </TouchableOpacity>
 
         {Platform.OS === 'web' ? (
           <textarea
@@ -2397,24 +2405,6 @@ const PresentationGoalInput = ({
           theme={theme}
         />
 
-        {/* Internal Vault Modal - Rendered inside this modal's context */}
-        {vaultModalProps && (
-          <VaultRequiredModal
-            {...vaultModalProps}
-            theme={theme}
-          />
-        )}
-
-        {/* Vault Needed Modal - shown when user tries internet/upload with vault off */}
-        <VaultRequiredModal
-          visible={showVaultNeededModal}
-          onClose={() => setShowVaultNeededModal(false)}
-          onSelectVault={(vault) => { onSelectFolder(vault.unique_id || vault.id); setShowVaultNeededModal(false); }}
-          onCreateVault={() => { setShowVaultNeededModal(false); onCreateVault?.(); }}
-          folders={folders}
-          theme={theme}
-          message={vaultNeededMessage}
-        />
 
         {/* Upload Progress Popup - Rendered inside modal so it's visible above overlay */}
         <UploadProgressPopup

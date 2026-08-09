@@ -4,9 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons as Icon, Ionicons } from '@expo/vector-icons';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import UnifiedUploadModal from '../UnifiedUploadModal'; // Unified upload modal
-import VaultRequiredModal from '../VaultRequiredModal';
 import UploadProgressPopup from '../UploadProgressPopup'; // Upload progress popup for visibility inside modal
-import VaultSelectorChip from '../ui/VaultSelectorChip';
 import ReportStylePicker, { REPORT_STYLES, getStyleCSS } from './ReportStylePicker';
 import authService from '../../services/authService';
 
@@ -45,19 +43,17 @@ const ReportGoalSetting = ({
   userDeviceId,
   selectedFolders = [],
   folders = [],
-  onSelectFolder,
-  onCreateVault,
   persona = null,
   uploadModalProps, // NEW: Props for internal ChatUniversalUploadModal
-  vaultModalProps, // NEW: Props for internal VaultRequiredModal
 }) => {
   const { useUploadedData, setUseUploadedData } = useWorkspace();
 
-  // Guard: check vault is enabled before allowing features that need it
+  // Guard: check the data-source toggle is on before allowing features that need it.
+  // selectedFolders is always exactly one auto-created folder now, never empty —
+  // the only real gate left is the useUploadedData toggle itself.
   const requireVault = useCallback((featureMessage) => {
     if (!useUploadedData || !selectedFolders || selectedFolders.length === 0) {
-      setVaultNeededMessage(featureMessage);
-      setShowVaultNeededModal(true);
+      Alert.alert('Data Source Required', featureMessage);
       return false;
     }
     return true;
@@ -101,8 +97,6 @@ const ReportGoalSetting = ({
 
   // Internal modal state
   const [showInternalUploadModal, setShowInternalUploadModal] = useState(false);
-  const [showVaultNeededModal, setShowVaultNeededModal] = useState(false);
-  const [vaultNeededMessage, setVaultNeededMessage] = useState('');
   
   // Scroll ref for section list
   const sectionListRef = useRef(null);
@@ -735,20 +729,33 @@ const ReportGoalSetting = ({
         <Text style={styles.stepSubtitle}>Describe your goal and AI will draft an outline grounded in your knowledge base</Text>
       </View>
 
-      {/* Vault Selector - Prominent vault selection */}
-      <View style={{ marginBottom: 16 }}>
-        <VaultSelectorChip
-          selectedFolders={selectedFolders}
-          folders={folders}
-          onSelectFolder={onSelectFolder}
-          onCreateVault={onCreateVault}
-          theme={{ primary: '#2196F3', background: '#fff', text: '#333', surface: '#fafafa', border: '#ddd', textSecondary: '#888' }}
-          label="Data Source"
-          insideModal
-          vaultEnabled={useUploadedData}
-          onToggleVault={setUseUploadedData}
+      {/* Grounding folder — one auto-created folder per report, no picker.
+          Toggle controls whether generation draws on its uploaded documents. */}
+      <TouchableOpacity
+        onPress={() => setUseUploadedData(!useUploadedData)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 16,
+          padding: 12,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: '#ddd',
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Icon name="folder-outline" size={18} color="#2196F3" />
+          <Text style={{ color: '#333', marginLeft: 8, flexShrink: 1 }} numberOfLines={1}>
+            {selectedFolders?.[0]?.name || 'Data Source'}
+          </Text>
+        </View>
+        <Ionicons
+          name={useUploadedData ? 'toggle' : 'toggle-outline'}
+          size={28}
+          color={useUploadedData ? '#2196F3' : '#888'}
         />
-      </View>
+      </TouchableOpacity>
 
       {/* Goal Input */}
       <TextInput
@@ -1229,25 +1236,6 @@ const ReportGoalSetting = ({
           }}
           currentStyle={selectedStyle}
           theme={{ primary: '#2196F3', background: '#fff', text: '#333', surface: '#fafafa', border: '#ddd', textSecondary: '#888' }}
-        />
-
-        {/* Internal Vault Modal */}
-        {vaultModalProps && (
-          <VaultRequiredModal
-            {...vaultModalProps}
-            theme={{ primary: '#2196F3', background: '#fff', text: '#333', surface: '#fafafa', border: '#ddd', textSecondary: '#888' }}
-          />
-        )}
-
-        {/* Vault Needed Modal - shown when user tries internet/upload with vault off */}
-        <VaultRequiredModal
-          visible={showVaultNeededModal}
-          onClose={() => setShowVaultNeededModal(false)}
-          onSelectVault={(vault) => { onSelectFolder(vault.unique_id || vault.id); setShowVaultNeededModal(false); }}
-          onCreateVault={() => { setShowVaultNeededModal(false); onCreateVault?.(); }}
-          folders={folders}
-          theme={{ primary: '#2196F3', background: '#fff', text: '#333', surface: '#fafafa', border: '#ddd', textSecondary: '#888' }}
-          message={vaultNeededMessage}
         />
 
         {/* Upload Progress Popup - Rendered inside modal so it's visible above overlay */}
