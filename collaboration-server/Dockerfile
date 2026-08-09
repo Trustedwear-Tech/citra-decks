@@ -1,0 +1,44 @@
+# Dockerfile for Collaboration Service
+FROM node:20-alpine
+
+# Build-time argument to mark environment (prod/test)
+ARG APP_ENV=prod
+
+ENV NODE_ENV=production \
+    PORT=1234 \
+    TZ=America/New_York \
+    APP_ENV=${APP_ENV}
+
+WORKDIR /app
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init curl moreutils
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application files
+COPY . .
+
+# Create directories for LevelDB persistence and logs
+RUN mkdir -p /app/y-leveldb-storage /app/logs && \
+    chown -R node:node /app
+
+# Switch to non-root user
+USER node
+
+# Expose WebSocket port
+EXPOSE 1234
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://127.0.0.1:1234/health || exit 1
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Start the collaboration service
+CMD ["node", "server.js"]

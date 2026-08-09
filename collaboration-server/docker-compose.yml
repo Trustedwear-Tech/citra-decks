@@ -1,0 +1,63 @@
+# docker-compose.yml for Collaboration Server (Y.js websocket, port 1234)
+#
+# Cloud deploy: pulls ghcr.io/trustedwear-tech/citra-ai/collaboration-server:${IMAGE_TAG}
+# Config from Vault (no .env in prod).
+
+x-common: &common
+  image: ghcr.io/trustedwear-tech/citra-ai/collaboration-server:${IMAGE_TAG:-prod-latest}
+  restart: unless-stopped
+  networks:
+    - citra-network
+  volumes:
+    - ~/citra-ai/logs/collaboration-server:/app/logs
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  collaboration-server-prod:
+    <<: *common
+    profiles: [prod]
+    container_name: collaboration-server-prod
+    ports: ["1234:1234"]
+    env_file:
+      - .vault_secret
+    volumes:
+      - ./y-leveldb-storage-prod:/app/y-leveldb-storage
+      - ~/citra-ai/logs/collaboration-server:/app/logs
+    environment:
+      TZ: "America/New_York"
+      PORT: "1234"
+      PERSISTENCE_DIR: "/app/y-leveldb-storage"
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_ROLE_ID: "8441202d-9461-92eb-009f-d720edf8ad5c"
+      VAULT_SECRET_PATH: "prod/collaboration-server"
+      NODE_ENV: "production"
+    command: sh -c "node server.js 2>&1 | tee -a /app/logs/collaboration_prod.log"
+
+  collaboration-server-test:
+    <<: *common
+    profiles: [test]
+    container_name: collaboration-server-test
+    ports: ["1235:1234"]
+    env_file:
+      - .vault_secret
+    volumes:
+      - ./y-leveldb-storage-test:/app/y-leveldb-storage
+      - ~/citra-ai/logs/collaboration-server:/app/logs
+    environment:
+      TZ: "America/New_York"
+      PORT: "1234"
+      PERSISTENCE_DIR: "/app/y-leveldb-storage"
+      VAULT_ADDR: "${VAULT_ADDR:-http://vault:8200}"
+      VAULT_ROLE_ID: "8441202d-9461-92eb-009f-d720edf8ad5c"
+      VAULT_SECRET_PATH: "test/collaboration-server"
+      NODE_ENV: "production"
+    command: sh -c "node server.js 2>&1 | tee -a /app/logs/collaboration_test.log"
+
+networks:
+  citra-network:
+    external: true
+    name: citra-network

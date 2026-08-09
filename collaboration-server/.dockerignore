@@ -1,0 +1,11 @@
+# Collaboration Server Docker Ignore
+node_modules/
+npm-debug.log
+.env.local
+.DS_Store
+*.log
+y-leveldb-storage/
+y-leveldb-storage-test/
+.git/
+.gitignore
+README.md

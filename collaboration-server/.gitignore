@@ -1,0 +1,16 @@
+﻿node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment files (contain secrets)
+
+# LevelDB storage (runtime data)
+y-leveldb-storage/
+y-leveldb-storage-prod/
+y-leveldb-storage-test/
+
+# OS files
+.DS_Store
+Thumbs.db

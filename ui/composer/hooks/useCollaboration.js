@@ -9,10 +9,13 @@ const COLLAB_SERVER_URL = _runtimeEnv.COLLAB_SERVER_URL || process.env.EXPO_PUBL
 const MAX_RECONNECT_ATTEMPTS = 5;
 const MAX_BACKOFF_TIME = 30000; // 30 seconds cap on exponential backoff
 
-// Kill switch: real-time collaboration is DISABLED platform-wide. This gates
-// every consumer of this hook (Presentation, Printable, Report composers).
-// Flip to true to re-enable; the collaboration-server must also be re-enabled.
-const COLLABORATION_ENABLED = false;
+// Kill switch, gates every consumer of this hook (Presentation, Printable,
+// Report composers). Enabled by default — the collaboration-server
+// (citra-decks/collaboration-server) must also have COLLABORATION_ENABLED=true
+// and share the same JWT_SECRET, or every connection attempt will fail
+// (server rejects the upgrade with 503 while its own switch is off, or 401
+// if the secrets don't match).
+const COLLABORATION_ENABLED = true;
 
 /**
  * useCollaboration - Real-time collaboration hook with team/workspace support
