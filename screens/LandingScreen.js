@@ -60,16 +60,13 @@ export default function LandingScreen({ onSelectType, theme }) {
 
         <View style={styles.footer}>
           <Text style={[styles.footerLine, { color: theme.textSecondary }]}>
-            Citra is a product of Trustedwear Tech Private Limited
-          </Text>
-          <Text style={[styles.footerLine, { color: theme.textSecondary }]}>
-            Founder ex-Microsoft (20+ yrs enterprise software) · Incubated at IIT Patna
+            Citra is a product of Trustedwear Tech Private Limited · Incubated at IIT Patna
           </Text>
           <Text style={[styles.footerLine, { color: theme.textSecondary }]}>
             Funded by Startup India, MeitY &amp; the Government of Bihar
           </Text>
           <Text style={[styles.footerContact, { color: theme.textSecondary }]}>
-            Rohit Kumar Chandan · Founder · rohit@citra-ai.com · https://citra-ai.com
+            https://citra-ai.com
           </Text>
         </View>
       </ScrollView>

@@ -112,8 +112,7 @@ what a real deployment needs that isn't here yet.
 
 Apache-2.0. See `LICENSE`.
 
-Citra is a product of Trustedwear Tech Private Limited · Founder ex-Microsoft
-(20+ yrs enterprise software) · Incubated at IIT Patna · Funded by Startup
-India, MeitY & the Government of Bihar.
+Citra is a product of Trustedwear Tech Private Limited · Incubated at IIT
+Patna · Funded by Startup India, MeitY & the Government of Bihar.
 
-Rohit Kumar Chandan · Founder · rohit@citra-ai.com · https://citra-ai.com
+https://citra-ai.com
