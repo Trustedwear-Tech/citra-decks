@@ -37,6 +37,7 @@ import TiptapEditor from './TiptapEditor';
 import ComposerToolbar from './ComposerToolbar';
 import CollaborationPanel from './CollaborationPanel';
 import CollaborationLockIndicator from './CollaborationLockIndicator'; // Imported
+import FolderDetailModal from '../FolderDetailModal';
 import UpdateInstructionModal from './UpdateInstructionModal'; // Imported
 import EditSlideOutlineModal from './EditSlideOutlineModal'; // Edit single section topic/outline
 import { useCollaboration } from './hooks/useCollaboration'; // New Import
@@ -576,6 +577,7 @@ const ReportComposer = ({
   const [showHeaderFooterModal, setShowHeaderFooterModal] = useState(false);
   const [showStylePickerModal, setShowStylePickerModal] = useState(false);
   const [showCloseConfirmModal, setShowCloseConfirmModal] = useState(false);
+  const [showFolderDetailModal, setShowFolderDetailModal] = useState(false);
   const [addPageInsertIndex, setAddPageInsertIndex] = useState(null);
 
   // Page management state
@@ -3956,12 +3958,12 @@ ${pagesHtml}
               <Ionicons name="close" size={24} color={safeTheme.text} />
             </TouchableOpacity>
 
-            {/* Vault Name Badge */}}
+            {/* Vault Name Badge — tap to open the folder detail popup */}
             {vaultDisplayName && (
-              <View style={styles.vaultBadge}>
+              <TouchableOpacity style={styles.vaultBadge} onPress={() => setShowFolderDetailModal(true)}>
                 <MaterialIcons name="folder" size={14} color="#666" />
                 <Text style={styles.vaultBadgeText}>{vaultDisplayName}</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {currentReportId && (
               <CollaborationLockIndicator
@@ -5126,6 +5128,13 @@ ${pagesHtml}
           onClose={() => setShowStylePickerModal(false)}
           onSelectStyle={handleStyleChange}
           currentStyle={reportMetadata?.reportStyle}
+          theme={safeTheme}
+        />
+
+        <FolderDetailModal
+          visible={showFolderDetailModal}
+          onClose={() => setShowFolderDetailModal(false)}
+          folderId={selectedFolders?.[0]?.id}
           theme={safeTheme}
         />
       </View>

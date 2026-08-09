@@ -56,6 +56,7 @@ import SlideLayoutPicker from '../composer/SlideLayoutPicker';
 import { createPageFromTemplate, PAGE_TEMPLATES } from './printableTemplates';
 import { useClipboard } from '../composer/hooks/useClipboard';
 import PrintableAnalyticsModal from './PrintableAnalyticsModal';
+import FolderDetailModal from '../FolderDetailModal';
 import useImagePaste from '../../hooks/useImagePaste';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -390,6 +391,7 @@ const PrintableComposer = ({
   const [showArrangeModal, setShowArrangeModal] = useState(false);
   const [targetPAGEIdForLayoutChange, setTargetPAGEIdForLayoutChange] = useState(null);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false); // Analytics modal state
+  const [showFolderDetailModal, setShowFolderDetailModal] = useState(false); // Folder detail popup state
   const [showCollaborationPanel, setShowCollaborationPanel] = useState(false); // Collaboration panel state
   const [showQualityModal, setShowQualityModal] = useState(false);
   const generationQuality = printableGoal?.generationQuality || 'premium';
@@ -5329,6 +5331,7 @@ const PrintableComposer = ({
                 onPresent={() => startPresentation()}
                 onClose={() => setShowCloseConfirmModal(true)}
                 onShowAnalytics={() => setShowAnalyticsModal(true)}
+                onOpenFolder={() => setShowFolderDetailModal(true)}
                 onShowCollaboration={() => setShowCollaborationPanel(true)}
                 collaborationStatus={collaboration?.status}
                 collaborators={collaboration?.collaborators}
@@ -6366,6 +6369,14 @@ const PrintableComposer = ({
             const token = await authService.getToken();
             return token ? { Authorization: `Bearer ${token}` } : {};
           }}
+        />
+
+        {/* Folder Detail Modal */}
+        <FolderDetailModal
+          visible={showFolderDetailModal}
+          onClose={() => setShowFolderDetailModal(false)}
+          folderId={selectedFolders?.[0]?.id}
+          theme={safeTheme}
         />
 
         {/* Arrange Pages Modal */}

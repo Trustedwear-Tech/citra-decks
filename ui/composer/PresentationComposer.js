@@ -54,6 +54,7 @@ import SlideLayoutPicker from './SlideLayoutPicker';
 import { createSlideFromTemplate } from './utils/slideTemplates';
 import { useClipboard } from './hooks/useClipboard';
 import PresentationAnalyticsModal from './PresentationAnalyticsModal';
+import FolderDetailModal from '../FolderDetailModal';
 import PresentationSharedToolbar from './PresentationSharedToolbar';
 import { showDesktopEditingAlert } from '../../utils/mobileEditAlert';
 import useImagePaste from '../../hooks/useImagePaste';
@@ -376,6 +377,7 @@ const PresentationComposer = ({
   const [showArrangeModal, setShowArrangeModal] = useState(false);
   const [targetSlideIdForLayoutChange, setTargetSlideIdForLayoutChange] = useState(null);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false); // Analytics modal state
+  const [showFolderDetailModal, setShowFolderDetailModal] = useState(false); // Folder detail popup state
   const [showCollaborationPanel, setShowCollaborationPanel] = useState(false); // Collaboration panel state
   const [showQualityModal, setShowQualityModal] = useState(false);
   const [authToken, setAuthToken] = useState(null);
@@ -5292,6 +5294,7 @@ const PresentationComposer = ({
               onPresent={() => startPresentation()}
               onClose={() => setShowCloseConfirmModal(true)}
               onShowAnalytics={() => setShowAnalyticsModal(true)}
+              onOpenFolder={() => setShowFolderDetailModal(true)}
               onShowCollaboration={() => setShowCollaborationPanel(true)}
               collaborationStatus={collaboration?.status}
               collaborators={collaboration?.collaborators}
@@ -5492,6 +5495,7 @@ const PresentationComposer = ({
                           }
                         }}
                         onShowAnalytics={() => setShowAnalyticsModal(true)}
+                        onOpenFolder={() => setShowFolderDetailModal(true)}
                         onShowCollaboration={() => setShowCollaborationPanel(true)}
                         collaborationStatus={collaboration?.status}
                         collaborators={collaboration?.collaborators}
@@ -6319,6 +6323,14 @@ const PresentationComposer = ({
             const token = await authService.getToken();
             return token ? { Authorization: `Bearer ${token}` } : {};
           }}
+        />
+
+        {/* Folder Detail Modal */}
+        <FolderDetailModal
+          visible={showFolderDetailModal}
+          onClose={() => setShowFolderDetailModal(false)}
+          folderId={selectedFolders?.[0]?.id}
+          theme={safeTheme}
         />
 
         {/* Arrange Slides Modal */}

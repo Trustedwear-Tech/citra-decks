@@ -32,6 +32,7 @@ const PresentationSharedToolbar = memo(({
   onPresent,
   onClose,
   onShowAnalytics,
+  onOpenFolder,
   onShowCollaboration,
   collaborationStatus,
   collaborators = [],
@@ -361,6 +362,15 @@ const PresentationSharedToolbar = memo(({
           <Tooltip text="View Analytics" theme={theme}>
             <TouchableOpacity style={toolbarStyles.ghostBtn} onPress={onShowAnalytics}>
               <Ionicons name="stats-chart-outline" size={18} color={theme.text} />
+            </TouchableOpacity>
+          </Tooltip>
+        )}
+
+        {/* Open Folder Button */}
+        {onOpenFolder && (
+          <Tooltip text="View data source folder" theme={theme}>
+            <TouchableOpacity style={toolbarStyles.ghostBtn} onPress={onOpenFolder}>
+              <Ionicons name="folder-outline" size={18} color={theme.text} />
             </TouchableOpacity>
           </Tooltip>
         )}
