@@ -17,8 +17,10 @@ RUN apk add --no-cache dumb-init curl moreutils
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies. --only=production was removed in newer npm
+# (this build errored on it, printing npm's usage/help text instead of
+# installing) — --omit=dev is the current equivalent.
+RUN npm ci --omit=dev
 
 # Copy application files
 COPY . .
