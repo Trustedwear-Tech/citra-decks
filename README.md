@@ -46,6 +46,12 @@ product. See `VENDORED.md`.
 Mongo · Milvus (vectors) · object storage (S3/MinIO) · a sandbox for computing
 real figures from spreadsheets · an OpenAI-compatible model endpoint.
 
+## Community
+
+**Discord:** https://discordapp.com/channels/1519703038724669551/1519703039416467518
+— shared with Citra Flows and Citra Projects. Questions, setup issues, or
+what a real deployment needs that isn't here yet.
+
 ## Licence
 
 Apache-2.0. See `LICENSE`.
