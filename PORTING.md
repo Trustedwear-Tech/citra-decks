@@ -35,15 +35,18 @@ that first real run established, and what it left open:
       `POST /from-url` is chunked, embedded with `baai/bge-m3` at 768, written
       to Milvus, and comes back from the composers' vault prefetch for a
       related query. The grounding path works.
-- [ ] **Local file upload does not exist.** `api/chunked_documents.py`'s
-      `@router.post("/upload")` is commented out, and the method it called,
-      `store_document_with_embeddings`, is not in
-      `services/enhanced_chunked_document_service.py` at all — it did not
-      survive the carve-out. Uncommenting the route is therefore not enough;
-      the orchestration has to be rebuilt from the pieces that DID survive
-      (`create_embeddings_and_store_Milvus_only`,
-      `store_mongodb_chunks_enhanced`, `store_vector_mapping`). Until then
-      `/from-url` is the only way in, and it accepts HTML only.
+- [x] **Local file upload works.** Verified: `POST /v2/documents` with
+      `file`, `document_id`, `filename` and `folder_id` returns
+      `vectors_created: 1, text_extracted: true`, stores the original in
+      MinIO, and the content comes back through the composers' vault prefetch
+      for a related query. `hooks/useDocumentUpload.js` is what the composer
+      upload buttons call.
+
+      An earlier revision of this file claimed upload did not exist. That was
+      wrong: it read the commented-out `@router.post("/upload")` in
+      `api/chunked_documents.py` as the upload path. That handler is a
+      superseded v1 whose service method was removed; `/v2/documents`
+      replaced it. Worth deleting so it stops misleading readers.
 - [ ] Generate one full deck end to end from a real document set.
 - [ ] Confirm the sandbox path that computes figures from spreadsheets works
       without the platform's job queue.

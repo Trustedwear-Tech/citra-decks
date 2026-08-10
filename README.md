@@ -144,22 +144,34 @@ generation; toggle "use data source" off per-artifact to generate AI-only
 instead. The folder's contents are visible from a button in each composer's
 toolbar.
 
-> **Getting documents into a folder — read this first.** The local file-upload
-> route did not survive the carve-out from the parent platform: the handler in
-> `api/chunked_documents.py` is commented out because the service method it
-> called (`store_document_with_embeddings`) was removed, so uncommenting it
-> alone will not work. Until it is rebuilt, the working ingestion path is
-> `POST /from-url`, which fetches a URL, chunks it, embeds it and indexes it:
->
-> ```bash
-> curl -X POST http://localhost:8093/from-url \
->   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
->   -d '{"url":"https://example.com/policy","folder_id":"<id>","topic":"policy"}'
-> ```
->
-> It accepts **HTML only** — a `text/plain` or raw-markdown URL is rejected on
-> content type. Verified working end to end: fetch → chunk → embed with bge-m3
-> → retrievable via the composers' vault prefetch.
+Two ways in, both verified end to end (upload → extract → embed with bge-m3 →
+retrievable through the composers' vault prefetch):
+
+**The upload button in each composer** posts to `POST /v2/documents`. Driving
+it directly takes the same four fields the UI sends:
+
+```bash
+curl -X POST http://localhost:8093/v2/documents \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@policy.md" -F "document_id=$(uuidgen)" \
+  -F "filename=policy.md" -F "folder_id=<id>"
+```
+
+**`POST /from-url`** fetches a page instead of taking a file:
+
+```bash
+curl -X POST http://localhost:8093/from-url \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/policy","folder_id":"<id>","topic":"policy"}'
+```
+
+It accepts **HTML only** — a `text/plain` or raw-markdown URL is rejected on
+content type.
+
+> Ignore the commented-out `@router.post("/upload")` in
+> `api/chunked_documents.py`. It is a superseded v1 handler whose service
+> method no longer exists; `/v2/documents` replaced it. It is dead code, not a
+> missing feature.
 
 ## Model configuration
 
