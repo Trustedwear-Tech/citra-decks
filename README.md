@@ -66,6 +66,7 @@ module map for all three composers.
 | **Docker Engine 24+** with Compose v2 | runs the whole stack |
 | **16 GB+ RAM** | Milvus is the heaviest container |
 | **An OpenRouter key** | drafting, grounding and vision |
+| **A Runware key** | generated imagery — required, a few cents per image |
 
 ### Easiest: the wizard
 
@@ -75,8 +76,10 @@ cd citra-decks
 make wizard
 ```
 
-It asks for one OpenRouter key, wires it to drafting, embeddings and vision,
-optionally takes a Runware key for generated imagery, and brings the stack up.
+It asks for two keys — one OpenRouter key, wired to drafting, embeddings and
+vision, and one Runware key for generated imagery — then brings the stack up.
+Both are required; every model choice it writes is a quick-start default you
+can change in `.env` afterwards.
 
 > **No `make`?** It is not installed by default on Windows, and the targets are
 > thin wrappers — run the scripts directly instead:
@@ -183,7 +186,7 @@ Every default is open-weights:
 | Drafting | `deepseek/deepseek-v4-pro` | `LLM_LARGE/MEDIUM/SMALL_MODEL` |
 | Slide + report layout | `z-ai/glm-5.1` | `PRESENTATION_LLM_MODEL` / `PRINTABLE_LLM_MODEL` — measurably better structure than the general-purpose tier |
 | Embeddings | `baai/bge-m3` at 768 | the client sends `dimensions`, so it returns 768 rather than its native 1024, matching the Milvus collection |
-| **Image generation** | **required — Runware or any FLUX endpoint** | cover art and section imagery. Its own key either way: the one thing OpenRouter does not serve |
+| **Image generation** | **required — Runware, `runware:400@1`** | cover art and section imagery. Its own key: the one thing the OpenRouter key does not cover |
 | Vision (layout critique) | `qwen/qwen3-vl-32b-instruct` — **off** | `CRITIC_VISION_ENABLED=false`. Turn on only if you see glitches |
 
 **Image generation is required, and the wizard will not continue without it.**
@@ -191,17 +194,23 @@ Without imagery the composers still generate, but the output is plain — no
 cover art, no section visuals, just text and charts. That is the largest
 single difference between a deck that looks designed and one that reads like
 an outline, and it costs a few cents an image, so declining saves nothing
-worth having. Pick one of:
+worth having.
+
+**The wizard configures Runware and nothing else** — deliberately. It is what
+this product has actually been built and tested against, and it is the only
+backend whose image **edit** action works, so it is the one configuration
+guaranteed to behave on a first run. Two other backends are supported in code
+and documented in `.env.example`, and switching to either is an `.env` edit
+after setup rather than another trip through the wizard:
 
 | `IMAGE_GEN_PROVIDER` | What it is | Editing |
 |---|---|---|
-| `runware` | Cloud, simplest. `IMAGE_GEN_API_KEY` and you are done. | ✅ |
+| `runware` | What the wizard sets. `IMAGE_GEN_API_KEY` and you are done. | ✅ |
 | `openai` | Any OpenAI-compatible `/images/generations` endpoint — Together, Fal, DeepInfra, Nebius, or your own — which is how you run **FLUX** without a Runware account. Set `IMAGE_GEN_BASE_URL` and `IMAGE_GEN_MODEL` too. | ✗ |
 | `comfyui` | Self-hosted ComfyUI; nothing leaves your network. | ✗ |
 
-Only Runware supports the composers' image **edit** action; the other two
-generate but cannot edit. If you genuinely want imagery off, that is an
-`.env` decision — set the variables yourself and skip the wizard.
+If you genuinely want imagery off, that too is an `.env` decision — set the
+variables yourself and skip the wizard.
 
 **Leave vision off until you need it.** It is a separate thing from image
 generation: it re-renders each finished slide and sends the picture to a

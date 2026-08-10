@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Guided first-run setup:
 #   1. .env with fresh secrets
-#   2. AI provider (required — generation needs a model)
-#   3. bring the stack up
+#   2. AI provider — one OpenRouter key for drafting, grounding and vision
+#   3. image generation — a Runware key (required; it is what puts imagery
+#      on the slides, and the OpenRouter key does not cover it)
+#   4. bring the stack up
 #
 # Re-runnable: reads and updates the existing .env, so run it again to change
 # a key. Prereqs: docker, curl, openssl.
@@ -37,7 +39,7 @@ echo "$(b "citra-decks — setup wizard")"
 echo "Sovereign presentations, visual reports and long-form documents."
 
 # -- 1. .env ------------------------------------------------------------------
-hr; echo "$(b "Step 1/3 — environment file")"
+hr; echo "$(b "Step 1/4 — environment file")"
 if [ -f "$ENV_FILE" ]; then
   echo "Found an existing .env — keeping it (values you set are preserved)."
 else
@@ -98,89 +100,49 @@ echo "  [ok] one key configured for drafting and grounding"
 echo "       (vision credentials set too, but the critique pass stays off)"
 
 # -- 3. Image generation ----------------------------------------------------------
-# Asked as a real question with a default of YES, not buried as an optional
-# extra. Without imagery a generated deck is a text outline: no cover art, no
-# section visuals. It is the largest single difference in how the output
-# LOOKS, it costs a few cents per image, and a user who skips it will
-# reasonably conclude the product produces plain slides. Skipping stays
-# possible — it just is not the path of least resistance any more.
-# Required, with a choice of backend. Not optional: without imagery a
-# generated deck is a text outline — no cover art, no section visuals — which
-# is the largest single difference in how the output looks. Both options cost
-# a few cents an image, so there is no meaningful saving in declining, and a
-# user who skipped it would reasonably conclude the product makes plain
-# slides. .env remains the escape hatch for anyone who genuinely wants it off.
+# Required, and deliberately Runware only. Without imagery a generated deck is
+# a text outline — no cover art, no section visuals — which is the largest
+# single difference in how the output looks, and it costs a few cents an
+# image, so declining saves nothing worth having.
+#
+# One backend here, not a menu: Runware is what this product has actually been
+# built and tested against. The code supports two others (any OpenAI-compatible
+# image endpoint, and self-hosted ComfyUI) and .env documents both, but the
+# wizard's job is to produce a configuration that works on the first run rather
+# than to enumerate every possibility.
 hr; echo "$(b "Step 3/4 — image generation (required)")"
-echo "This generates the cover art and section imagery on your slides and"
-echo "report pages. Without it decks come out plain: text and charts only."
-echo "It is the biggest single difference in how the output looks, and costs"
-echo "a few cents per image."
+echo "Runware generates the cover art and section imagery on your slides and"
+echo "report pages. Without it decks come out plain: text and charts only —"
+echo "the biggest single difference in how the output looks. A few cents per"
+echo "image, so a full deck costs very little."
 echo
-echo "Neither option is served by OpenRouter, so this needs its own key."
-echo "  1) Runware            — cloud, simplest. Also the only one that"
-echo "                          supports image EDITING in the composers."
-echo "  2) OpenAI-compatible  — any /images/generations endpoint serving FLUX"
-echo "                          (Together, Fal, DeepInfra, Nebius, your own)."
-img_choice="$(ask "Choose 1 or 2" "1")"
-
-case "$img_choice" in
-  1)
-    echo "  Get a key: $(b "https://runware.ai")"
-    rw="$(ask_secret "Runware API key (input hidden)")"
-    if [ -z "$rw" ]; then
-      echo
-      echo "  [FAIL] no key entered. Decks would generate without any imagery," >&2
-      echo "         which is not what this product is for. Re-run once you have" >&2
-      echo "         a key — or, if you truly want imagery off, set" >&2
-      echo "         IMAGE_GEN_API_KEY yourself in .env and skip this wizard." >&2
-      exit 1
-    fi
-    # Asked, not hardcoded, so a Runware user can pick a model the same way
-    # the OpenAI-compatible option lets them. The default is the AIR id this
-    # repo already ships and relies on: image_gen_api.py names it
-    # EDIT_CAPABLE_MODEL because it handles generation AND editing, and
-    # Runware is the only backend whose edit action works at all. Change it
-    # only if you know the replacement also supports edits, or the composers'
-    # edit button will start failing.
-    echo "  Model: Runware AIR ids look like runware:<id>@<version>."
-    echo "         The default below is the one this repo ships; it supports"
-    echo "         both generation and editing."
-    rmodel="$(ask "Runware model" "runware:400@1")"
-    setkv IMAGE_GEN_PROVIDER "runware"
-    setkv IMAGE_GEN_API_KEY  "$rw"
-    setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
-    setkv IMAGE_GEN_BASE_URL ""
-    echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
-    ;;
-  2)
-    echo "  Example endpoints:"
-    echo "    Together   https://api.together.xyz/v1   black-forest-labs/FLUX.1-dev"
-    echo "    DeepInfra  https://api.deepinfra.com/v1/openai"
-    ibase="$(ask "Image API base URL" "https://api.together.xyz/v1")"
-    imodel="$(ask "Image model" "black-forest-labs/FLUX.1-dev")"
-    ikey="$(ask_secret "Image API key (input hidden)")"
-    if [ -z "$ibase" ] || [ -z "$imodel" ]; then
-      echo
-      echo "  [FAIL] base URL and model are both required for this option." >&2
-      exit 1
-    fi
-    if [ -z "$ikey" ]; then
-      echo
-      echo "  [FAIL] no key entered. If your endpoint genuinely needs no key," >&2
-      echo "         set IMAGE_GEN_API_KEY yourself in .env and skip this wizard." >&2
-      exit 1
-    fi
-    setkv IMAGE_GEN_PROVIDER "openai"
-    setkv IMAGE_GEN_BASE_URL "$ibase"
-    setkv IMAGE_GEN_MODEL    "$imodel"
-    setkv IMAGE_GEN_API_KEY  "$ikey"
-    echo "  [ok] $imodel configured via $ibase"
-    echo "       (note: image EDITING in the composers needs Runware)"
-    ;;
-  *)
-    echo "  [FAIL] choose 1 or 2." >&2
-    exit 1 ;;
-esac
+echo "This is the one thing the OpenRouter key does not cover, so it needs"
+echo "its own. Get one at: $(b "https://runware.ai")"
+echo
+echo "The model below is a QUICK-START DEFAULT — press Enter to accept it."
+echo "Other backends (any OpenAI-compatible image endpoint, or a self-hosted"
+echo "ComfyUI) are configurable later in .env; see the IMAGE_GEN_ notes there."
+rw="$(ask_secret "Runware API key (input hidden)")"
+if [ -z "$rw" ]; then
+  echo
+  echo "  [FAIL] no key entered. Decks would generate without any imagery," >&2
+  echo "         which is not what this product is for. Re-run once you have" >&2
+  echo "         a key — or, if you truly want imagery off, set the IMAGE_GEN_" >&2
+  echo "         variables yourself in .env and skip this wizard." >&2
+  exit 1
+fi
+# Asked rather than hardcoded so a Runware user can pick their model, but
+# defaulted so pressing Enter always yields a working config. The default is
+# the AIR id this repo ships and relies on: image_gen_api.py names it
+# EDIT_CAPABLE_MODEL because it does generation AND editing, and Runware is the
+# only backend whose edit action works — swap it only for something that also
+# supports edits, or the composers' edit button starts failing.
+rmodel="$(ask "Runware model" "runware:400@1")"
+setkv IMAGE_GEN_PROVIDER "runware"
+setkv IMAGE_GEN_API_KEY  "$rw"
+setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
+setkv IMAGE_GEN_BASE_URL ""
+echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
 
 # Vision is a different thing from image generation, and it is OFF by default.
 # It re-renders each finished slide and sends the image to a vision model to
