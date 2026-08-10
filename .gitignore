@@ -78,3 +78,8 @@ Thumbs.db
 # =============================================================================
 *.bak
 *.tmp
+
+# Backups/variants of .env are never safe to track (a .env.bak.* copy
+# was committed once and pushed with live keys in it).
+.env.*
+!.env.example

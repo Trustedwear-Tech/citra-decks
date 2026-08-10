@@ -66,7 +66,17 @@ async def _get_openai_embedding_client() -> AsyncOpenAI:
         return _openai_client
     
     if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY environment variable is not set")
+        # Name the variable the user is actually told to set. OPENAI_API_KEY is
+        # only the legacy fallback (see the resolution at the top of this file),
+        # and naming it alone sends people looking for the wrong key.
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "EMBEDDING_API_KEY is not set — document upload cannot embed into "
+                "the data store without it. Set EMBEDDING_API_KEY (and "
+                "EMBEDDING_BASE_URL / EMBEDDING_MODEL) in .env; see .env.example."
+            ),
+        )
     
     if _openai_lock is None:
         _openai_lock = asyncio.Lock()

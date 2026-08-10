@@ -2167,17 +2167,9 @@ const PrintableComposer = ({
       if (selectedChartEl) {
         console.log('📊 [AI_CHAT_CHART] Chart element selected, routing to Chart AI:', selectedChartEl.id);
 
-        // Add user message to history immediately for feedback
-        // Note: We don't have direct access to setChatHistory here as it might be in AIAssistantPanel
-        // But the orchestrator flow doesn't update history either? 
-        // Ah, Orchestrator returns 'enhanced_PAGE' or 'chart_config' usually.
-        // But AIAssistantPanel likely manages chat history via props or internal state.
-        // Wait, handleAiEnhance is inside printableComposer.
-        // Does printableComposer have 'chatMessages' state? 
-        // No, AIAssistantPanel is a separate component.
-        // But handleAiEnhance is called by AIAssistantPanel via `onSend`.
-        // The return value of this function might be important?
-        // No, it's void promises.
+        // Chat history lives in this component's own aiChatMessages state —
+        // the inline right sidebar renders it, so there is nothing to hand
+        // back to a caller here.
 
         // Only use vault if folders are explicitly selected (no default to 'general')
         try {

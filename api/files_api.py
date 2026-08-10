@@ -8,7 +8,11 @@ from typing import Optional, List
 from services.files_service import FilesService
 from citra_auth import get_secure_user_id
 from citra_mongo import get_async_mongo_client, MONGODB_DATABASE
-from bucket import delete_file
+# Aliased: the DELETE /files/{file_id} route handler below is also named
+# delete_file, and an unaliased import is shadowed by it — the S3 cleanup then
+# calls the route (which wants a `request` arg), fails with a TypeError, and
+# every delete silently orphans its S3 object while reporting success=false.
+from bucket import delete_file as delete_file_from_s3
 from config.milvus_config import get_milvus_client, get_collection_name
 import os
 import logging
@@ -187,7 +191,7 @@ async def delete_file(
                     s3_key = s3_url  # Fallback
                 
                 if s3_key:
-                    s3_deleted = delete_file(s3_key)
+                    s3_deleted = delete_file_from_s3(s3_key)
                     
                     if s3_deleted:
                         deletion_results["deleted_resources"].append({
