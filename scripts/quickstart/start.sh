@@ -61,6 +61,32 @@ else
   echo "       runs successfully. Not fatal; generation still works without it." >&2
 fi
 
+# -- 4. Compute sandbox image ----------------------------------------------------
+# services/code_executor.py spawns a container from this image to run the small
+# Python scripts that produce real figures from your spreadsheets — the
+# "numbers are computed, not generated" path in ARCHITECTURE.md §1. NOTHING
+# built it: the Dockerfile is referenced by no compose file, Makefile or
+# script, so on a fresh install the image was simply absent, every compute call
+# failed to spawn, and figures silently fell back to whatever the model said —
+# exactly the failure that design exists to prevent.
+#
+# The image name is quick-chat-sandbox because it outlived the Quick Chat
+# surface that named it; code_executor.py and sandbox_pool.py both default to
+# that string, so renaming it here would break them.
+SANDBOX_IMAGE="${QUICK_CHAT_SANDBOX_IMAGE:-quick-chat-sandbox}"
+if docker image inspect "$SANDBOX_IMAGE" >/dev/null 2>&1; then
+  echo "-> compute sandbox image present"
+else
+  echo "-> building the compute sandbox image ($SANDBOX_IMAGE) — first run only"
+  if docker build -q -t "$SANDBOX_IMAGE" -f Dockerfile.quick-chat-sandbox . >/dev/null 2>&1; then
+    echo "   [ok] sandbox built — figures will be computed from your files"
+  else
+    echo "   [!] sandbox build failed. Generation still works, but figures will" >&2
+    echo "       come from the model rather than being computed from your data." >&2
+    echo "       Retry: docker build -t $SANDBOX_IMAGE -f Dockerfile.quick-chat-sandbox ." >&2
+  fi
+fi
+
 # Read the published ports back out of .env so an override actually shows here.
 # Hardcoding them meant the banner confidently printed the wrong URL for anyone
 # who had changed one — the defaults must match docker-compose.yml.
