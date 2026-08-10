@@ -18,8 +18,12 @@ import { ShareButton } from '../ShareManager';
 // colour straight from it painted every glyph #e0e0e0 on white — legible as
 // a shape, but reading as "disabled". Contrast against the toolbar's own
 // background instead, and let Tooltip pick its light-mode (dark) bubble.
+// textSecondary is passed down into ColorPickerDropdown/BackgroundControlDropdown
+// for the Fill/Border/Bg labels; the dark theme's #a0a0a0 lands at ~2.3:1 on
+// white, under the 4.5:1 WCAG AA floor. #6B7280 clears it at ~4.8:1.
 const TOOLBAR_CHROME = {
   text: '#374151',
+  textSecondary: '#6B7280',
   isDark: false,
 };
 
