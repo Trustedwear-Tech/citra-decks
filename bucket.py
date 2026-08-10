@@ -111,6 +111,58 @@ def get_config():
 get_s3_config = get_config
 
 
+def _storage_class_kwargs() -> dict:
+    """
+    StorageClass args for put_object/copy_object, or nothing when the target
+    isn't AWS.
+
+    STANDARD_IA is an AWS-only class. MinIO rejects it outright with
+    `InvalidStorageClass`, which failed EVERY object write on the default
+    self-hosted stack this repo ships — uploaded documents fell back to the
+    `local://` sentinel and composer images/thumbnails never persisted at all.
+    BUCKET_ENDPOINT_URL being set is the same signal _get_client() already
+    uses to switch to path-style addressing for MinIO.
+    """
+    return {} if os.getenv('BUCKET_ENDPOINT_URL', '').strip() else {'StorageClass': 'STANDARD_IA'}
+
+
+def key_from_object_url(obj_url: str) -> str:
+    """
+    Recover the object key from a URL produced by upload_file().
+
+    Lives here because upload_file() builds these URLs, and the two must agree.
+    Callers used to hand-roll this and only handled the AWS virtual-host and
+    `s3://` forms, falling through to "use the whole URL as the key" — which
+    silently never matched for the MinIO path-style form this stack actually
+    produces (`{endpoint}/{bucket}/{key}`), so deletes left the object behind.
+
+    Returns the key including the environment prefix; delete_file() and friends
+    accept it with or without.
+    """
+    if not obj_url:
+        return ''
+
+    if '.amazonaws.com/' in obj_url:
+        return obj_url.split('.amazonaws.com/', 1)[1]
+
+    if obj_url.startswith('s3://'):
+        # s3://bucket/key
+        without_scheme = obj_url[len('s3://'):]
+        return without_scheme.split('/', 1)[1] if '/' in without_scheme else ''
+
+    if '://' in obj_url:
+        # Path-style: scheme://host[:port]/bucket/key  (MinIO, and AWS path-style)
+        path = obj_url.split('://', 1)[1]
+        path = path.split('/', 1)[1] if '/' in path else ''
+        bucket_name, _ = get_config()
+        if path.startswith(f'{bucket_name}/'):
+            return path[len(bucket_name) + 1:]
+        return path
+
+    # Already a bare key.
+    return obj_url.lstrip('/')
+
+
 def upload_file(file_content: bytes, s3_key: str, content_type: str = 'application/octet-stream') -> str:
     """
     Upload file to bucket with environment-based folder structure.
@@ -131,14 +183,15 @@ def upload_file(file_content: bytes, s3_key: str, content_type: str = 'applicati
         env_prefix = get_environment_prefix()
         full_key = f"{env_prefix}/{s3_key.lstrip('/')}"
         
-        # Upload file with Standard-IA storage class for cost savings
-        # Standard-IA is ideal for infrequently accessed data (30+ days retention)
+        # Standard-IA on AWS for cost savings (ideal for infrequently accessed
+        # data); omitted on MinIO, which rejects the class — see
+        # _storage_class_kwargs.
         client.put_object(
             Bucket=bucket_name,
             Key=full_key,
             Body=file_content,
             ContentType=content_type,
-            StorageClass='STANDARD_IA'  # Cost-effective storage for infrequent access
+            **_storage_class_kwargs()
         )
         
         # Return object URL
@@ -198,7 +251,7 @@ def upload_intermediate(file_content: bytes, *, user_id: str, job_id: str,
             Key=full_key,
             Body=file_content,
             ContentType=content_type,
-            StorageClass="STANDARD_IA",
+            **_storage_class_kwargs(),
             Tagging="citra-purpose=action-chat-intermediate",
             Metadata={
                 "citra-user-id": str(user_id),
@@ -244,7 +297,7 @@ def copy_file(source_key: str, dest_key: str) -> bool:
             Bucket=bucket_name,
             CopySource={'Bucket': bucket_name, 'Key': full_source},
             Key=full_dest,
-            StorageClass='STANDARD_IA'
+            **_storage_class_kwargs()
         )
         logger.info(f"📋 Copied object: {full_source} → {full_dest}")
         return True

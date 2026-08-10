@@ -13,7 +13,8 @@
  * only place a user can see — and remove — what they uploaded. "View" opens
  * the extracted text stored in MongoDB (see DocumentContentModal), which is
  * what actually grounds generation; delete cascades server-side across the
- * Milvus vectors, the Mongo chunks and the registry row.
+ * Milvus vectors, the stored original in S3, the Mongo chunks and the
+ * registry row.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, Alert } from 'react-native';
@@ -128,8 +129,8 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
       );
       const body = await response.json().catch(() => ({}));
 
-      // The endpoint answers 200 with success:false when a sub-step (Milvus
-      // or Mongo) failed, so the status alone is not enough.
+      // The endpoint answers 200 with success:false when a sub-step (Milvus,
+      // S3 or Mongo) failed, so the status alone is not enough.
       if (!response.ok || body.success === false) {
         const detail = body?.details?.errors?.join('; ') || body?.message || `HTTP ${response.status}`;
         throw new Error(detail);

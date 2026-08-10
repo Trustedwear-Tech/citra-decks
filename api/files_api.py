@@ -8,9 +8,11 @@ from typing import Optional, List
 from services.files_service import FilesService
 from citra_auth import get_secure_user_id
 from citra_mongo import get_async_mongo_client, MONGODB_DATABASE
-# No bucket/S3 import: an uploaded document lives in MongoDB (extracted text
-# and chunks) and Milvus (vectors), and deleting those two is deleting the
-# document. Object storage is not part of this path.
+# Aliased deliberately: the DELETE /files/{file_id} route handler below is also
+# named delete_file, and an unaliased import gets shadowed by it — the S3
+# cleanup then calls the route (which wants a `request` arg), raises TypeError,
+# and every delete orphans its S3 object while reporting success=false.
+from bucket import delete_file as delete_file_from_s3, key_from_object_url
 from config.milvus_config import get_milvus_client, get_collection_name
 import os
 import logging
@@ -113,6 +115,7 @@ async def delete_file(
     """
     Delete file completely from everywhere:
     - Milvus vector database
+    - S3/MinIO (the stored original)
     - MongoDB (all related collections)
     - File registry
     
@@ -173,7 +176,38 @@ async def delete_file(
                 deletion_results["errors"] = deletion_results.get("errors", [])
                 deletion_results["errors"].append(f"Milvus deletion failed: {str(e)}")
         
-        # 2. Delete from MongoDB collections
+        # 2. Delete the stored original from S3/MinIO.
+        # Uploads still write the original file there (document_manager
+        # .save_file_to_s3_storage), and the Excel/CSV sandbox mounts it back by
+        # s3_url — so skipping this step would leave the object behind forever.
+        s3_url = resources.get("s3_url")
+        # save_file_to_s3_storage returns the sentinel "local://{document_id}"
+        # when the object store was unreachable, so there is nothing to delete —
+        # without this guard that sentinel is truthy and we'd issue a delete for
+        # a key that never existed on every such record.
+        if s3_url and not s3_url.startswith("local://"):
+            try:
+                # bucket.py owns the URL format, so it owns parsing it back.
+                s3_key = key_from_object_url(s3_url)
+
+                if s3_key:
+                    if delete_file_from_s3(s3_key):
+                        deletion_results["deleted_resources"].append({
+                            "service": "s3",
+                            "s3_key": s3_key
+                        })
+                        logger.info(f"✅ Deleted S3 object {s3_key} for {file_id}")
+                    else:
+                        logger.warning(f"⚠️ S3 deletion returned false for {file_id}")
+
+            except Exception as e:
+                # Non-fatal: the document is still gone from Mongo and Milvus,
+                # which is what makes it stop grounding generation.
+                logger.warning(f"⚠️ S3 deletion failed for {file_id} (continuing): {e}")
+                deletion_results["errors"] = deletion_results.get("errors", [])
+                deletion_results["errors"].append(f"S3 deletion failed (non-critical): {str(e)}")
+
+        # 3. Delete from MongoDB collections
         mongodb_refs = resources.get("mongodb_refs", {})
         db = mongo_client[MONGODB_DATABASE]
         structured_cleanup_doc_ids = set()
@@ -253,7 +287,7 @@ async def delete_file(
                     f"Structured cleanup failed: {str(e)}"
                 )
         
-        # 3. Delete from file registry
+        # 4. Delete from file registry
         registry_deleted = await registry_service.delete_file(file_id, user_id)
         if registry_deleted:
             deletion_results["deleted_resources"].append({
