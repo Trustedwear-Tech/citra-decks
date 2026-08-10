@@ -135,11 +135,22 @@ case "$img_choice" in
       echo "         IMAGE_GEN_API_KEY yourself in .env and skip this wizard." >&2
       exit 1
     fi
+    # Asked, not hardcoded, so a Runware user can pick a model the same way
+    # the OpenAI-compatible option lets them. The default is the AIR id this
+    # repo already ships and relies on: image_gen_api.py names it
+    # EDIT_CAPABLE_MODEL because it handles generation AND editing, and
+    # Runware is the only backend whose edit action works at all. Change it
+    # only if you know the replacement also supports edits, or the composers'
+    # edit button will start failing.
+    echo "  Model: Runware AIR ids look like runware:<id>@<version>."
+    echo "         The default below is the one this repo ships; it supports"
+    echo "         both generation and editing."
+    rmodel="$(ask "Runware model" "runware:400@1")"
     setkv IMAGE_GEN_PROVIDER "runware"
     setkv IMAGE_GEN_API_KEY  "$rw"
-    setkv IMAGE_GEN_MODEL    "runware:400@1"
+    setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
     setkv IMAGE_GEN_BASE_URL ""
-    echo "  [ok] Runware configured — slides will have generated imagery"
+    echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
     ;;
   2)
     echo "  Example endpoints:"
