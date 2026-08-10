@@ -20,13 +20,31 @@ warning. Delete them — do **not** vendor `graph/` to silence the log.
 
 ## 2. Not yet run end to end
 
-The stack has never actually been started (Mongo + Milvus + MinIO + backend +
-collaboration server + web shell) — every check so far has been static
-(import resolution, `@babel/parser`, a real `import main` boot test, dependency
-resolution via `npm install`). `make wizard` should bring it up; the first real
-run will surface whatever the static checks couldn't:
+The stack has now been brought up from a clean clone and driven partway. What
+that first real run established, and what it left open:
 
-- [ ] Bring up the full stack and generate one deck from a real document set.
+- [x] **Bring the full stack up.** Mongo + Milvus + MinIO + backend +
+      collaboration server + web shell all start and report healthy from
+      `setup.sh` → `start.sh` on a fresh clone. It surfaced four bugs, all
+      fixed: a stale `mongodb_data` volume making Mongo reject the generated
+      password (and the readiness loop blaming the replica set for it), the
+      MinIO port colliding with a sibling Citra stack, a banner printing
+      hardcoded ports, and the wizard configuring the LLM but never
+      embeddings.
+- [x] **Ingest → embed → retrieve.** A document fetched through
+      `POST /from-url` is chunked, embedded with `baai/bge-m3` at 768, written
+      to Milvus, and comes back from the composers' vault prefetch for a
+      related query. The grounding path works.
+- [ ] **Local file upload does not exist.** `api/chunked_documents.py`'s
+      `@router.post("/upload")` is commented out, and the method it called,
+      `store_document_with_embeddings`, is not in
+      `services/enhanced_chunked_document_service.py` at all — it did not
+      survive the carve-out. Uncommenting the route is therefore not enough;
+      the orchestration has to be rebuilt from the pieces that DID survive
+      (`create_embeddings_and_store_Milvus_only`,
+      `store_mongodb_chunks_enhanced`, `store_vector_mapping`). Until then
+      `/from-url` is the only way in, and it accepts HTML only.
+- [ ] Generate one full deck end to end from a real document set.
 - [ ] Confirm the sandbox path that computes figures from spreadsheets works
       without the platform's job queue.
 - [ ] Confirm two browser tabs editing the same document actually sync through

@@ -4795,8 +4795,15 @@ async def upload_document_from_url(
             "topic_or_filename": topic_or_filename,
             "source_url": url,
             "word_count": metadata.get('word_count', 0),
-            "total_chunks": result.get('total_chunks', 0),
-            "total_vectors": result.get('total_vectors', 0),
+            # These read the keys the producer ACTUALLY returns.
+            # create_embeddings_and_store_Milvus_only returns 'vectors_created'
+            # and 'chunks' (a list) — not 'total_chunks'/'total_vectors'. Reading
+            # the wrong names meant .get(...) fell through to 0 on every call, so
+            # a successful ingest reported "total_chunks: 0, total_vectors: 0"
+            # while happily writing chunks to Milvus. The response said nothing
+            # was indexed; the index disagreed.
+            "total_chunks": len(result.get('chunks') or []),
+            "total_vectors": result.get('vectors_created', 0),
             "processing_time_seconds": round(processing_time, 2),
             "message": f"Successfully processed content from {parsed_url.netloc}"
         }

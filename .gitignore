@@ -83,3 +83,10 @@ Thumbs.db
 # was committed once and pushed with live keys in it).
 .env.*
 !.env.example
+
+# Test fixtures, scratch downloads and coverage output. A 1 MB crime dataset,
+# a stray downloaded PDF and a coverage DB were tracked and published before
+# these rules existed.
+.coverage
+*.xlsx
+downloaded_file_*

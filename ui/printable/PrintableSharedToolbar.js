@@ -14,8 +14,18 @@ import BackgroundControlDropdown from '../composer/BackgroundControlDropdown';
 import Tooltip from '../ui/Tooltip';
 import { ShareButton } from '../ShareManager';
 
+// The toolbar chrome is a fixed light surface (see toolbarStyles.toolbar:
+// #fff background, #E5E7EB border). The app theme is dark, so taking icon
+// colour straight from it painted every glyph #e0e0e0 on white — legible as
+// a shape, but reading as "disabled". Contrast against the toolbar's own
+// background instead, and let Tooltip pick its light-mode (dark) bubble.
+const TOOLBAR_CHROME = {
+  text: '#374151',
+  isDark: false,
+};
+
 const PrintableSharedToolbar = memo(({
-  theme,
+  theme: appTheme,
   activeCanvasRef,
   selectionInfo, // { hasSelection, type, fill, stroke, fontSize, lineHeight, fontWeight, fontStyle, textAlign, isText }
   // Action callbacks that go to PrintableComposer (not per-canvas)
@@ -50,6 +60,10 @@ const PrintableSharedToolbar = memo(({
   onChangeBackgroundOpacity,
   onRemoveBackgroundImage,
 }) => {
+  // Keeps every existing `theme.text` reference below correct without
+  // touching ~70 call sites; theme.primary and the rest pass through.
+  const theme = { ...appTheme, ...TOOLBAR_CHROME };
+
   const { width: screenWidth } = useWindowDimensions();
   const isMobile = screenWidth < 768;
 
