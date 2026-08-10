@@ -183,8 +183,22 @@ Every default is open-weights:
 | Drafting | `deepseek/deepseek-v4-pro` | `LLM_LARGE/MEDIUM/SMALL_MODEL` |
 | Slide + report layout | `z-ai/glm-5.1` | `PRESENTATION_LLM_MODEL` / `PRINTABLE_LLM_MODEL` — measurably better structure than the general-purpose tier |
 | Embeddings | `baai/bge-m3` at 768 | the client sends `dimensions`, so it returns 768 rather than its native 1024, matching the Milvus collection |
-| Vision (layout critique, OCR) | `qwen/qwen3-vl-32b-instruct` | |
-| Image generation | *off* — Runware if you want it | the one capability OpenRouter does not serve, so it needs its own key |
+| **Image generation** | **Runware — on, strongly recommended** | cover art and section imagery. Needs its own key: the one thing OpenRouter does not serve |
+| Vision (layout critique) | `qwen/qwen3-vl-32b-instruct` — **off** | `CRITIC_VISION_ENABLED=false`. Turn on only if you see glitches |
+
+**Set the Runware key.** Without it the composers still generate, but the
+output is plain — no cover art, no section visuals, just text and charts. It
+is the largest single difference between a deck that looks designed and one
+that reads like an outline, and Runware charges a few cents an image, so a
+full deck costs very little. The wizard asks for it and defaults to yes; if
+you skip it, add `IMAGE_GEN_API_KEY` to `.env` whenever you like.
+
+**Leave vision off until you need it.** It is a separate thing from image
+generation: it re-renders each finished slide and sends the picture to a
+vision model to find overlaps and patch the layout. That is real time and
+tokens on every generation, for a problem most decks do not have. If you do
+see elements overlapping or text running off a slide, set
+`CRITIC_VISION_ENABLED=true` — the credentials are already configured.
 
 Everything routes through whichever endpoint the matching `*_BASE_URL` points
 at, so **swapping is an `.env` edit, not a migration**: point them at your own
