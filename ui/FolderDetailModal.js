@@ -1,16 +1,21 @@
 /**
- * FolderDetailModal — read-only view of an artifact's dedicated folder.
+ * FolderDetailModal — the contents view for an artifact's dedicated folder.
  *
  * New for citra-decks, not a port: the equivalent component in Citra-UI's
  * history (FolderManagementPanel.js) is a full multi-folder browser with
  * drag-and-drop, sharing, and Teams coupling — the wrong shape for "show
  * me what's in this one folder." This is deliberately minimal: folder
- * name/description (GET /api/folders/{folder_id}) plus its file list
- * (GET /api/v2/files?folder_id=X), both already-existing, already-working
- * endpoints with no prior UI consumer.
+ * name/description (GET /api/folders/{folder_id}), its file list
+ * (GET /api/v2/files?folder_id=X), and per-file download + delete
+ * (DELETE /api/v2/files/{file_id}).
+ *
+ * There is no folder picker anywhere in this product, so this modal is the
+ * only place a user can see — and remove — what they uploaded. Delete
+ * cascades server-side: Milvus vectors, the S3 object, the Mongo chunks and
+ * the registry row all go together.
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import authService from '../services/authService';
 import { CONFIG } from '../config/config';
@@ -30,11 +35,34 @@ const FILE_TYPE_ICONS = {
   note: 'create-outline',
 };
 
+/**
+ * Confirm through whichever dialog the platform actually shows.
+ * Alert.alert is a no-op on react-native-web, so a delete confirmed there
+ * would silently never fire — hence the window.confirm branch.
+ */
+function confirmDestructive(title, message) {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(
+      typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`)
+    );
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+    ]);
+  });
+}
+
 export default function FolderDetailModal({ visible, onClose, folderId, theme }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [folder, setFolder] = useState(null);
   const [files, setFiles] = useState([]);
+  // `${fileId}:delete|download` — keeps one row's spinner local and stops
+  // a double-tap firing the same destructive call twice.
+  const [busyFile, setBusyFile] = useState(null);
+  const [actionError, setActionError] = useState(null);
 
   const load = useCallback(async () => {
     if (!folderId) return;
@@ -72,6 +100,85 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
       load();
     }
   }, [visible, folderId, load]);
+
+  const handleDelete = useCallback(async (file) => {
+    const fileId = file.id || file._id;
+    if (!fileId) {
+      setActionError('This file has no id — cannot delete it.');
+      return;
+    }
+
+    const confirmed = await confirmDestructive(
+      'Delete document',
+      `Remove "${file.filename || 'this file'}" from the data store? Its embeddings ` +
+      'are deleted too, so it will no longer ground generation. This cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    setBusyFile(`${fileId}:delete`);
+    setActionError(null);
+    try {
+      const response = await authService.authenticatedFetch(
+        `${CONFIG.CITRA_SERVICE_URL}/api/v2/files/${encodeURIComponent(fileId)}`,
+        { method: 'DELETE' }
+      );
+      const body = await response.json().catch(() => ({}));
+
+      // The endpoint answers 200 with success:false when a sub-step (Milvus,
+      // S3, Mongo) failed, so the status alone is not enough.
+      if (!response.ok || body.success === false) {
+        const detail = body?.details?.errors?.join('; ') || body?.message || `HTTP ${response.status}`;
+        throw new Error(detail);
+      }
+
+      setFiles((prev) => prev.filter((f) => (f.id || f._id) !== fileId));
+    } catch (e) {
+      console.error('❌ [FOLDER_DETAIL] Delete failed:', e);
+      setActionError(`Delete failed: ${e.message}`);
+    } finally {
+      setBusyFile(null);
+    }
+  }, []);
+
+  const handleDownload = useCallback(async (file) => {
+    const documentId = file.document_id || file.id || file._id;
+    if (!documentId) {
+      setActionError('This file has no document id — cannot open it.');
+      return;
+    }
+
+    setBusyFile(`${documentId}:download`);
+    setActionError(null);
+    try {
+      // This endpoint hands back a presigned S3 URL (or, for text
+      // reconstructed out of chunks, a data: URL) — not the bytes.
+      const response = await authService.authenticatedFetch(
+        `${CONFIG.CITRA_SERVICE_URL}/api/documents/${encodeURIComponent(documentId)}/download`
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const { download_url: downloadUrl, filename } = await response.json();
+      if (!downloadUrl) throw new Error('No download URL returned.');
+
+      if (downloadUrl.startsWith('data:')) {
+        const anchor = document.createElement('a');
+        anchor.href = downloadUrl;
+        anchor.download = filename || file.filename || 'download';
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+      } else {
+        // Presigned URL is cross-origin, so the download attribute would be
+        // ignored and a fetch would hit CORS — hand it to the browser.
+        window.open(downloadUrl, '_blank', 'noopener');
+      }
+    } catch (e) {
+      console.error('❌ [FOLDER_DETAIL] Download failed:', e);
+      setActionError(`Download failed: ${e.message}`);
+    } finally {
+      setBusyFile(null);
+    }
+  }, []);
 
   return (
     <Modal visible={!!visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -111,27 +218,67 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
                 {files.length} file{files.length !== 1 ? 's' : ''}
               </Text>
 
+              {!!actionError && (
+                <Text style={[styles.actionError, { color: theme.error || '#ef4444' }]}>
+                  {actionError}
+                </Text>
+              )}
+
               <ScrollView style={styles.fileList}>
                 {files.length === 0 ? (
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                     No documents in this folder yet.
                   </Text>
                 ) : (
-                  files.map((file) => (
-                    <View key={file.id || file._id || file.filename} style={[styles.fileRow, { borderColor: theme.borderColor }]}>
-                      <Ionicons
-                        name={FILE_TYPE_ICONS[file.file_type_category] || 'document-outline'}
-                        size={18}
-                        color={theme.textSecondary}
-                      />
-                      <Text style={[styles.fileName, { color: theme.text }]} numberOfLines={1}>
-                        {file.filename || 'Untitled'}
-                      </Text>
-                      <Text style={[styles.fileSize, { color: theme.textSecondary }]}>
-                        {formatBytes(file.file_size_bytes)}
-                      </Text>
-                    </View>
-                  ))
+                  files.map((file) => {
+                    const fileId = file.id || file._id;
+                    const documentId = file.document_id || fileId;
+                    const isDeleting = busyFile === `${fileId}:delete`;
+                    const isDownloading = busyFile === `${documentId}:download`;
+                    const rowBusy = isDeleting || isDownloading;
+
+                    return (
+                      <View key={fileId || file.filename} style={[styles.fileRow, { borderColor: theme.borderColor }]}>
+                        <Ionicons
+                          name={FILE_TYPE_ICONS[file.file_type_category] || 'document-outline'}
+                          size={18}
+                          color={theme.textSecondary}
+                        />
+                        <Text style={[styles.fileName, { color: theme.text }]} numberOfLines={1}>
+                          {file.filename || 'Untitled'}
+                        </Text>
+                        <Text style={[styles.fileSize, { color: theme.textSecondary }]}>
+                          {formatBytes(file.file_size_bytes)}
+                        </Text>
+
+                        {isDownloading ? (
+                          <ActivityIndicator size="small" color={theme.primary} style={styles.rowAction} />
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleDownload(file)}
+                            disabled={rowBusy}
+                            style={styles.rowAction}
+                            accessibilityLabel={`Download ${file.filename || 'file'}`}
+                          >
+                            <Ionicons name="download-outline" size={18} color={theme.textSecondary} />
+                          </TouchableOpacity>
+                        )}
+
+                        {isDeleting ? (
+                          <ActivityIndicator size="small" color={theme.error || '#ef4444'} style={styles.rowAction} />
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleDelete(file)}
+                            disabled={rowBusy}
+                            style={styles.rowAction}
+                            accessibilityLabel={`Delete ${file.filename || 'file'}`}
+                          >
+                            <Ionicons name="trash-outline" size={18} color={theme.error || '#ef4444'} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })
                 )}
               </ScrollView>
             </>
@@ -208,5 +355,14 @@ const styles = StyleSheet.create({
   fileSize: {
     fontSize: 12,
     marginLeft: 8,
+  },
+  rowAction: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  actionError: {
+    fontSize: 12,
+    marginBottom: 8,
   },
 });

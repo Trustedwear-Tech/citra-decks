@@ -14,6 +14,7 @@ import ReportComposer from './ui/composer/ReportComposer';
 import ReportListModal from './ui/composer/ReportListModal';
 import PrintableComposer from './ui/printable/PrintableComposer';
 import PrintableListModal from './ui/printable/PrintableListModal';
+import useDocumentUpload from './hooks/useDocumentUpload';
 import { CONFIG } from './config/config';
 
 const CITRA_SERVICE_URL = CONFIG.CITRA_SERVICE_URL;
@@ -95,6 +96,14 @@ const AppContent = () => {
   const [activeArtifact, setActiveArtifact] = useState(null);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [folderCreateError, setFolderCreateError] = useState(null);
+
+  // Supplies UnifiedUploadModal's `actions`. Scoped to the open artifact's
+  // folder — there is no folder picker in this product, so every upload from
+  // a composer lands in that artifact's own data store.
+  const upload = useDocumentUpload({
+    folderId: activeFolder?.id || activeArtifact?.folder_id || null,
+    folderName: activeFolder?.name,
+  });
 
   const handleSelectType = useCallback((type) => {
     setSelectedType(type);
@@ -209,6 +218,20 @@ const AppContent = () => {
       selectedFolders,
       folders: selectedFolders,
       [initialPropName]: activeArtifact,
+      // Without this the upload modal renders but every tile is inert.
+      uploadModalProps: {
+        actions: upload.actions,
+        onPasteTextSubmit: upload.pasteText,
+        onInternetIngestFetch: upload.internetIngestFetch,
+        onInternetIngestEmbed: upload.internetIngestEmbed,
+        onUploadStatusChange: upload.setUploadStatus,
+        enhancedProgress: upload.uploadProgress,
+        selectedFolderIds: selectedFolders.map((f) => f.id),
+        folders: selectedFolders,
+        uploadSuccessToast: upload.uploadSuccess,
+        onCloseUploadSuccessToast: () =>
+          upload.setUploadSuccess((prev) => ({ ...prev, visible: false })),
+      },
     };
     return (
       // No useUploadedData/setUseUploadedData props — WorkspaceProvider

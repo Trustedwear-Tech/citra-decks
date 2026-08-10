@@ -61,15 +61,26 @@ else
   echo "       runs successfully. Not fatal; generation still works without it." >&2
 fi
 
+# Read the published ports back out of .env so an override actually shows here.
+# Hardcoding them meant the banner confidently printed the wrong URL for anyone
+# who had changed one — the defaults must match docker-compose.yml.
+# `|| true` is required, not decorative: getenv greps .env, this script runs
+# under `set -euo pipefail`, and these keys are absent from .env whenever the
+# compose defaults are being used — so grep exits 1, the pipeline fails, and
+# the script would abort here without ever printing the banner.
+WEB_PORT="$(getenv WEB_HOST_PORT || true)";          WEB_PORT="${WEB_PORT:-8094}"
+BACKEND_PORT="$(getenv BACKEND_HOST_PORT || true)";  BACKEND_PORT="${BACKEND_PORT:-8093}"
+CONSOLE_PORT="$(getenv MINIO_CONSOLE_PORT || true)"; CONSOLE_PORT="${CONSOLE_PORT:-9023}"
+
 cat <<EOF
 
 ----------------------------------------------------------------------------
 citra-decks is running.
 
-   Web UI          http://localhost:8094
-   Backend API     http://localhost:8093  (docs: /docs)
+   Web UI          http://localhost:${WEB_PORT}
+   Backend API     http://localhost:${BACKEND_PORT}  (docs: /docs)
    Collaboration   ws://localhost:1234    (health: /health)
-   MinIO console   http://localhost:9003
+   MinIO console   http://localhost:${CONSOLE_PORT}
 
    Register your first account from the web UI — there is no seeded admin;
    the local auth backend (api/local_auth.py) creates accounts on demand.
