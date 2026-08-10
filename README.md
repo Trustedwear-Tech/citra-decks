@@ -22,23 +22,80 @@ things you would least like to paste into someone else's cloud.
 Start on a hosted model API to evaluate. Point `LLM_LARGE_BASE_URL` at your own
 vLLM or Ollama endpoint for production, and nothing leaves your network.
 
+## How a deck gets made
+
+Worth understanding before you run it, because it explains what the stack is
+for. A generic slide tool asks a model to write plausible bullets. This asks a
+different question — *what do your documents and spreadsheets actually say?*
+
+```
+   Goal ("Q3 collections review for the board")
+     │
+     ├── retrieval ──► your uploaded documents  ──► cited passages
+     │                 (Milvus vector search)
+     │
+     ├── computation ─► your spreadsheets       ──► real figures
+     │                 (Python in a Docker sandbox)
+     │
+     ▼
+   Outline ──► slide/page generation ──► editable canvas ──► export
+```
+
+Two consequences drive most of the design:
+
+- **The vector database is not optional.** Retrieval *is* the product. Without
+  embeddings configured you have an expensive way to ask a model to guess —
+  which is why the wizard now sets them up rather than leaving them blank.
+- **Numbers are computed, not generated.** The model is asked for a small
+  Python script, which runs in a sandbox against your actual Excel/CSV with the
+  files mounted read-only; the **result** goes on the slide. A model asked to
+  "sum column D" gives a confident wrong number. A model asked to write
+  `df['D'].sum()` gives a correct one.
+
+One more piece worth knowing: the deck is **rendered to an image, critiqued by
+a vision model, and patched** from that critique. It is why the output does not
+look like a wall of bullets. `ARCHITECTURE.md` has the full pipeline and the
+module map for all three composers.
+
 ## Quickstart
 
-Requires Docker and Docker Compose. `make wizard` is the easiest first run — it
-asks for a model-provider API key, writes `.env`, and brings up the full stack.
+### Prerequisites
+
+| Need | Why |
+|------|-----|
+| **Docker Engine 24+** with Compose v2 | runs the whole stack |
+| **16 GB+ RAM** | Milvus is the heaviest container |
+| **An OpenRouter key** | drafting, grounding and vision |
+
+### Easiest: the wizard
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/Trustedwear-Tech/citra-decks.git
 cd citra-decks
 make wizard
 ```
 
-Prefer to configure by hand? `make setup` (generate `.env`, start the data
-stores, create the MinIO bucket) then `make start` (build and start the
-backend, collaboration server, and web shell) do the same two phases
-separately. `.env.example` is the template to start from. `make ps`,
-`make logs` and `make down` manage the running stack; see the `Makefile` for
-the full target list.
+It asks for one OpenRouter key, wires it to drafting, embeddings and vision,
+optionally takes a Runware key for generated imagery, and brings the stack up.
+
+> **No `make`?** It is not installed by default on Windows, and the targets are
+> thin wrappers — run the scripts directly instead:
+> `bash scripts/quickstart/wizard.sh`
+
+### Or by hand — two phases
+
+```bash
+make setup                     # or: bash scripts/quickstart/setup.sh
+#   generates .env, starts the data stores, creates the MinIO bucket
+
+# set your key in .env  ->  LLM_LARGE_API_KEY / EMBEDDING_API_KEY
+
+make start                     # or: bash scripts/quickstart/start.sh
+#   builds and starts the backend, collaboration server and web shell
+```
+
+`.env.example` is the template. `make ps`, `make logs` and `make down` manage
+the running stack; see the `Makefile` for the full target list.
 
 Once it's up:
 
@@ -87,15 +144,27 @@ composer's upload button) to ground generation in them; toggle "use data
 source" off per-artifact to generate AI-only instead. The folder's contents are
 visible from a button in each composer's toolbar.
 
-## LLM configuration
+## Model configuration
 
-Presentation and printable generation are pinned to **GLM-5.1** by default
-(`PRESENTATION_LLM_MODEL` / `PRINTABLE_LLM_MODEL` in `.env`) — it produces
-measurably better slide/report layouts than the platform's general-purpose
-large-tier model. Routed through whichever provider `LLM_LARGE_BASE_URL` points
-at; OpenRouter (`https://openrouter.ai/api/v1`) serves GLM-5.1 today, so that's
-the default. Point it at your own OpenAI-compatible endpoint (vLLM, Ollama) for
-production and nothing leaves your network — see `.env.example`.
+The wizard asks for **one OpenRouter key** and wires it to all three roles.
+Every default is open-weights:
+
+| Role | Default | Notes |
+|---|---|---|
+| Drafting | `deepseek/deepseek-v4-pro` | `LLM_LARGE/MEDIUM/SMALL_MODEL` |
+| Slide + report layout | `z-ai/glm-5.1` | `PRESENTATION_LLM_MODEL` / `PRINTABLE_LLM_MODEL` — measurably better structure than the general-purpose tier |
+| Embeddings | `baai/bge-m3` at 768 | the client sends `dimensions`, so it returns 768 rather than its native 1024, matching the Milvus collection |
+| Vision (layout critique, OCR) | `qwen/qwen3-vl-32b-instruct` | |
+| Image generation | *off* — Runware if you want it | the one capability OpenRouter does not serve, so it needs its own key |
+
+Everything routes through whichever endpoint the matching `*_BASE_URL` points
+at, so **swapping is an `.env` edit, not a migration**: point them at your own
+vLLM or Ollama and nothing leaves your network.
+
+> **Changing the embedding model means re-ingesting**, even at the same
+> dimension. Vectors written by one model do not share an embedding space with
+> another model's queries, so previously uploaded documents quietly stop
+> matching rather than failing loudly.
 
 ## Requirements
 
