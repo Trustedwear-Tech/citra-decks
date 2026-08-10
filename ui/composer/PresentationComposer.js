@@ -5487,7 +5487,6 @@ const PresentationComposer = ({
                           }
                         }}
                         onShowAnalytics={() => setShowAnalyticsModal(true)}
-                        onOpenFolder={() => setShowFolderDetailModal(true)}
                         onShowCollaboration={() => setShowCollaborationPanel(true)}
                         collaborationStatus={collaboration?.status}
                         collaborators={collaboration?.collaborators}
