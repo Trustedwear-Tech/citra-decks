@@ -183,15 +183,25 @@ Every default is open-weights:
 | Drafting | `deepseek/deepseek-v4-pro` | `LLM_LARGE/MEDIUM/SMALL_MODEL` |
 | Slide + report layout | `z-ai/glm-5.1` | `PRESENTATION_LLM_MODEL` / `PRINTABLE_LLM_MODEL` — measurably better structure than the general-purpose tier |
 | Embeddings | `baai/bge-m3` at 768 | the client sends `dimensions`, so it returns 768 rather than its native 1024, matching the Milvus collection |
-| **Image generation** | **Runware — on, strongly recommended** | cover art and section imagery. Needs its own key: the one thing OpenRouter does not serve |
+| **Image generation** | **required — Runware or any FLUX endpoint** | cover art and section imagery. Its own key either way: the one thing OpenRouter does not serve |
 | Vision (layout critique) | `qwen/qwen3-vl-32b-instruct` — **off** | `CRITIC_VISION_ENABLED=false`. Turn on only if you see glitches |
 
-**Set the Runware key.** Without it the composers still generate, but the
-output is plain — no cover art, no section visuals, just text and charts. It
-is the largest single difference between a deck that looks designed and one
-that reads like an outline, and Runware charges a few cents an image, so a
-full deck costs very little. The wizard asks for it and defaults to yes; if
-you skip it, add `IMAGE_GEN_API_KEY` to `.env` whenever you like.
+**Image generation is required, and the wizard will not continue without it.**
+Without imagery the composers still generate, but the output is plain — no
+cover art, no section visuals, just text and charts. That is the largest
+single difference between a deck that looks designed and one that reads like
+an outline, and it costs a few cents an image, so declining saves nothing
+worth having. Pick one of:
+
+| `IMAGE_GEN_PROVIDER` | What it is | Editing |
+|---|---|---|
+| `runware` | Cloud, simplest. `IMAGE_GEN_API_KEY` and you are done. | ✅ |
+| `openai` | Any OpenAI-compatible `/images/generations` endpoint — Together, Fal, DeepInfra, Nebius, or your own — which is how you run **FLUX** without a Runware account. Set `IMAGE_GEN_BASE_URL` and `IMAGE_GEN_MODEL` too. | ✗ |
+| `comfyui` | Self-hosted ComfyUI; nothing leaves your network. | ✗ |
+
+Only Runware supports the composers' image **edit** action; the other two
+generate but cannot edit. If you genuinely want imagery off, that is an
+`.env` decision — set the variables yourself and skip the wizard.
 
 **Leave vision off until you need it.** It is a separate thing from image
 generation: it re-renders each finished slide and sends the picture to a

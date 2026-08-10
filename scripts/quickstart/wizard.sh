@@ -104,31 +104,72 @@ echo "       (vision credentials set too, but the critique pass stays off)"
 # LOOKS, it costs a few cents per image, and a user who skips it will
 # reasonably conclude the product produces plain slides. Skipping stays
 # possible — it just is not the path of least resistance any more.
-hr; echo "$(b "Step 3/4 — image generation (strongly recommended)")"
-echo "Runware generates the cover art and section imagery on your slides and"
-echo "report pages. It is not served by OpenRouter, so it needs its own key."
+# Required, with a choice of backend. Not optional: without imagery a
+# generated deck is a text outline — no cover art, no section visuals — which
+# is the largest single difference in how the output looks. Both options cost
+# a few cents an image, so there is no meaningful saving in declining, and a
+# user who skipped it would reasonably conclude the product makes plain
+# slides. .env remains the escape hatch for anyone who genuinely wants it off.
+hr; echo "$(b "Step 3/4 — image generation (required)")"
+echo "This generates the cover art and section imagery on your slides and"
+echo "report pages. Without it decks come out plain: text and charts only."
+echo "It is the biggest single difference in how the output looks, and costs"
+echo "a few cents per image."
 echo
-echo "  Without it, generation still works — but decks come out plain: no"
-echo "  cover art, no visuals, just text and charts. This is the biggest"
-echo "  single difference in how the output looks."
-echo "  A few cents per image; a full deck costs very little."
-echo
-echo "  Get a key: $(b "https://runware.ai")"
-if yes_no "Add your Runware key now?" "y"; then
-  rw="$(ask_secret "Runware API key")"
-  if [ -n "$rw" ]; then
+echo "Neither option is served by OpenRouter, so this needs its own key."
+echo "  1) Runware            — cloud, simplest. Also the only one that"
+echo "                          supports image EDITING in the composers."
+echo "  2) OpenAI-compatible  — any /images/generations endpoint serving FLUX"
+echo "                          (Together, Fal, DeepInfra, Nebius, your own)."
+img_choice="$(ask "Choose 1 or 2" "1")"
+
+case "$img_choice" in
+  1)
+    echo "  Get a key: $(b "https://runware.ai")"
+    rw="$(ask_secret "Runware API key (input hidden)")"
+    if [ -z "$rw" ]; then
+      echo
+      echo "  [FAIL] no key entered. Decks would generate without any imagery," >&2
+      echo "         which is not what this product is for. Re-run once you have" >&2
+      echo "         a key — or, if you truly want imagery off, set" >&2
+      echo "         IMAGE_GEN_API_KEY yourself in .env and skip this wizard." >&2
+      exit 1
+    fi
     setkv IMAGE_GEN_PROVIDER "runware"
     setkv IMAGE_GEN_API_KEY  "$rw"
     setkv IMAGE_GEN_MODEL    "runware:400@1"
+    setkv IMAGE_GEN_BASE_URL ""
     echo "  [ok] Runware configured — slides will have generated imagery"
-  else
-    echo "  [!] no key entered — decks will generate WITHOUT imagery."
-    echo "      Add IMAGE_GEN_API_KEY to .env later to turn it on."
-  fi
-else
-  echo "  [!] skipped — decks will generate WITHOUT imagery."
-  echo "      Add IMAGE_GEN_API_KEY to .env later to turn it on."
-fi
+    ;;
+  2)
+    echo "  Example endpoints:"
+    echo "    Together   https://api.together.xyz/v1   black-forest-labs/FLUX.1-dev"
+    echo "    DeepInfra  https://api.deepinfra.com/v1/openai"
+    ibase="$(ask "Image API base URL" "https://api.together.xyz/v1")"
+    imodel="$(ask "Image model" "black-forest-labs/FLUX.1-dev")"
+    ikey="$(ask_secret "Image API key (input hidden)")"
+    if [ -z "$ibase" ] || [ -z "$imodel" ]; then
+      echo
+      echo "  [FAIL] base URL and model are both required for this option." >&2
+      exit 1
+    fi
+    if [ -z "$ikey" ]; then
+      echo
+      echo "  [FAIL] no key entered. If your endpoint genuinely needs no key," >&2
+      echo "         set IMAGE_GEN_API_KEY yourself in .env and skip this wizard." >&2
+      exit 1
+    fi
+    setkv IMAGE_GEN_PROVIDER "openai"
+    setkv IMAGE_GEN_BASE_URL "$ibase"
+    setkv IMAGE_GEN_MODEL    "$imodel"
+    setkv IMAGE_GEN_API_KEY  "$ikey"
+    echo "  [ok] $imodel configured via $ibase"
+    echo "       (note: image EDITING in the composers needs Runware)"
+    ;;
+  *)
+    echo "  [FAIL] choose 1 or 2." >&2
+    exit 1 ;;
+esac
 
 # Vision is a different thing from image generation, and it is OFF by default.
 # It re-renders each finished slide and sends the image to a vision model to

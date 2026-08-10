@@ -1,9 +1,16 @@
 """
-Image Generation Providers — abstraction layer for cloud (Runware) and
-self-hosted (ComfyUI) image generation backends.
+Image Generation Providers — abstraction layer over the image backends.
 
-Both providers return base64-encoded image data directly.
-The UI already handles base64 via ``image_data || image_url`` fallback.
+Three are supported, selected by ``IMAGE_GEN_PROVIDER``:
+
+  runware   cloud, via the Runware SDK
+  openai    any OpenAI-COMPATIBLE ``/images/generations`` endpoint — Together,
+            Fal, DeepInfra, Nebius, or your own server. This is how you point
+            citra-decks at a FLUX model without using Runware.
+  comfyui   self-hosted ComfyUI server
+
+All three return base64-encoded image data directly. The UI already handles
+base64 via its ``image_data || image_url`` fallback.
 """
 
 from abc import ABC, abstractmethod
@@ -199,6 +206,119 @@ class RunwareProvider(ImageGenProvider):
 
     def supports_edit(self) -> bool:       # noqa: D102
         return True
+
+
+# ─────────── OpenAI-compatible provider ───────────
+
+class OpenAICompatProvider(ImageGenProvider):
+    """Any endpoint exposing OpenAI's ``/images/generations`` shape.
+
+    Lets you run FLUX (or anything else) through Together, Fal, DeepInfra,
+    Nebius or your own server without a Runware account — configure it with
+    the same three variables everything else in this repo uses:
+
+        IMAGE_GEN_PROVIDER=openai
+        IMAGE_GEN_BASE_URL=https://api.together.xyz/v1
+        IMAGE_GEN_API_KEY=<key>
+        IMAGE_GEN_MODEL=black-forest-labs/FLUX.1-dev
+
+    Providers differ on how they hand the image back: some honour
+    ``response_format="b64_json"``, others ignore it and return a URL
+    regardless. Both are handled — a URL is fetched and encoded, so the
+    caller always gets base64, matching the other providers.
+    """
+
+    def __init__(self) -> None:
+        self.base_url = (os.getenv("IMAGE_GEN_BASE_URL") or "").strip()
+        self.api_key = (os.getenv("IMAGE_GEN_API_KEY") or "").strip()
+        if not self.base_url:
+            raise ValueError(
+                "IMAGE_GEN_PROVIDER=openai requires IMAGE_GEN_BASE_URL "
+                "(e.g. https://api.together.xyz/v1)"
+            )
+
+    async def generate(
+        self,
+        prompt: str,
+        negative_prompt: str,
+        width: int,
+        height: int,
+        model: str,
+        timeout: int = 60,
+    ) -> ImageGenResult:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            base_url=self.base_url,
+            api_key=self.api_key or "not-needed",
+            timeout=float(timeout),
+        )
+        started = time.time()
+        try:
+            # negative_prompt has no place in the OpenAI image schema. Rather
+            # than drop the caller's intent silently, append it as an explicit
+            # instruction — the only way to carry it over this API shape.
+            full_prompt = prompt
+            if negative_prompt:
+                full_prompt = f"{prompt}\n\nAvoid: {negative_prompt}"
+
+            resp = await client.images.generate(
+                model=model,
+                prompt=full_prompt,
+                size=f"{width}x{height}",
+                response_format="b64_json",
+                n=1,
+            )
+        except Exception as exc:                     # noqa: BLE001
+            raise ValueError(f"Image generation failed via {self.base_url}: {exc}") from exc
+
+        if not getattr(resp, "data", None):
+            raise ValueError("Image endpoint returned no data.")
+        item = resp.data[0]
+
+        b64 = getattr(item, "b64_json", None)
+        if b64:
+            logger.info("🖼️ [OPENAI-IMG] generated in %.1fs", time.time() - started)
+            return ImageGenResult(base64_data=b64, format="PNG")
+
+        url = getattr(item, "url", None)
+        if url:
+            async with httpx.AsyncClient(timeout=timeout) as http:
+                r = await http.get(url)
+                r.raise_for_status()
+                fmt = "PNG"
+                ctype = (r.headers.get("content-type") or "").lower()
+                if "jpeg" in ctype or "jpg" in ctype:
+                    fmt = "JPG"
+                elif "webp" in ctype:
+                    fmt = "WEBP"
+                logger.info("🖼️ [OPENAI-IMG] generated (via URL) in %.1fs", time.time() - started)
+                return ImageGenResult(base64_data=base64.b64encode(r.content).decode(), format=fmt)
+
+        raise ValueError("Image endpoint response contained neither b64_json nor url.")
+
+    async def edit(
+        self,
+        prompt: str,
+        negative_prompt: str,
+        source_image: str,
+        width: int,
+        height: int,
+        model: str,
+        strength: Optional[float] = None,
+        timeout: int = 60,
+    ) -> ImageGenResult:
+        # Deliberately unimplemented rather than faked. OpenAI's image EDIT
+        # endpoint takes multipart image+mask and is not consistently offered
+        # by the FLUX hosts this provider targets; supports_edit() returns
+        # False so callers route around it instead of hitting a broken path.
+        raise NotImplementedError(
+            "Image editing is not available on the OpenAI-compatible provider. "
+            "Use IMAGE_GEN_PROVIDER=runware for edits."
+        )
+
+    def supports_edit(self) -> bool:
+        return False
 
 
 # ─────────── ComfyUI provider ───────────
@@ -401,6 +521,13 @@ def get_provider() -> ImageGenProvider:
         logger.info(
             f"🖼️ Image gen provider: ComfyUI "
             f"({os.getenv('COMFYUI_SERVER_URL', 'http://localhost:8188')})"
+        )
+    elif provider_name in ("openai", "openai-compat", "flux"):
+        _provider_instance = OpenAICompatProvider()
+        logger.info(
+            f"🖼️ Image gen provider: OpenAI-compatible "
+            f"({os.getenv('IMAGE_GEN_BASE_URL', '?')}, model "
+            f"{os.getenv('IMAGE_GEN_MODEL', '?')})"
         )
     else:
         _provider_instance = RunwareProvider()
