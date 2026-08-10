@@ -211,8 +211,14 @@ services:
       MINIO_ROOT_PASSWORD: ${BUCKET_SECRET_KEY:?BUCKET_SECRET_KEY must be set}
     command: minio server /data --console-address ":9001"
     ports:
-      - "${MINIO_API_PORT:-9002}:9000"
-      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+      # 9022/9023, not the conventional 9002/9003 — same reasoning as every
+      # other port in this file. The sibling Citra products publish MinIO on
+      # 9002/9003, and a collision there does not fail cleanly: Docker leaves
+      # the container running but attached to no network, so the next `up`
+      # starts the broken container and the failure resurfaces later as an
+      # unrelated-looking DNS error.
+      - "${MINIO_API_PORT:-9022}:9000"
+      - "${MINIO_CONSOLE_PORT:-9023}:9001"
     volumes:
       - minio_data:/data
     healthcheck:
