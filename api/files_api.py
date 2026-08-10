@@ -8,11 +8,9 @@ from typing import Optional, List
 from services.files_service import FilesService
 from citra_auth import get_secure_user_id
 from citra_mongo import get_async_mongo_client, MONGODB_DATABASE
-# Aliased: the DELETE /files/{file_id} route handler below is also named
-# delete_file, and an unaliased import is shadowed by it — the S3 cleanup then
-# calls the route (which wants a `request` arg), fails with a TypeError, and
-# every delete silently orphans its S3 object while reporting success=false.
-from bucket import delete_file as delete_file_from_s3
+# No bucket/S3 import: an uploaded document lives in MongoDB (extracted text
+# and chunks) and Milvus (vectors), and deleting those two is deleting the
+# document. Object storage is not part of this path.
 from config.milvus_config import get_milvus_client, get_collection_name
 import os
 import logging
@@ -114,7 +112,6 @@ async def delete_file(
 ):
     """
     Delete file completely from everywhere:
-    - AWS S3
     - Milvus vector database
     - MongoDB (all related collections)
     - File registry
@@ -176,39 +173,7 @@ async def delete_file(
                 deletion_results["errors"] = deletion_results.get("errors", [])
                 deletion_results["errors"].append(f"Milvus deletion failed: {str(e)}")
         
-        # 2. Delete from S3
-        if resources.get("s3_url"):
-            try:
-                s3_url = resources["s3_url"]
-                
-                # Extract S3 key from URL
-                # URL format: https://<bucket>.s3.<region>.amazonaws.com/dev/files/...
-                if ".amazonaws.com/" in s3_url:
-                    s3_key = s3_url.split(".amazonaws.com/")[-1]
-                elif "s3://" in s3_url:
-                    s3_key = s3_url.split("s3://", 1)[-1].split("/", 1)[-1]
-                else:
-                    s3_key = s3_url  # Fallback
-                
-                if s3_key:
-                    s3_deleted = delete_file_from_s3(s3_key)
-                    
-                    if s3_deleted:
-                        deletion_results["deleted_resources"].append({
-                            "service": "s3",
-                            "s3_key": s3_key
-                        })
-                        logger.info(f"✅ Deleted S3 object {s3_key} for {file_id}")
-                    else:
-                        logger.warning(f"⚠️ S3 deletion failed for {file_id}")
-                        
-            except Exception as e:
-                # Log S3 errors but don't fail the deletion process
-                logger.warning(f"⚠️ S3 deletion failed for {file_id} (continuing): {e}")
-                deletion_results["errors"] = deletion_results.get("errors", [])
-                deletion_results["errors"].append(f"S3 deletion failed (non-critical): {str(e)}")
-        
-        # 3. Delete from MongoDB collections
+        # 2. Delete from MongoDB collections
         mongodb_refs = resources.get("mongodb_refs", {})
         db = mongo_client[MONGODB_DATABASE]
         structured_cleanup_doc_ids = set()
@@ -288,7 +253,7 @@ async def delete_file(
                     f"Structured cleanup failed: {str(e)}"
                 )
         
-        # 4. Delete from file registry
+        # 3. Delete from file registry
         registry_deleted = await registry_service.delete_file(file_id, user_id)
         if registry_deleted:
             deletion_results["deleted_resources"].append({

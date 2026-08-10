@@ -6,19 +6,21 @@
  * drag-and-drop, sharing, and Teams coupling — the wrong shape for "show
  * me what's in this one folder." This is deliberately minimal: folder
  * name/description (GET /api/folders/{folder_id}), its file list
- * (GET /api/v2/files?folder_id=X), and per-file download + delete
+ * (GET /api/v2/files?folder_id=X), and per-file view + delete
  * (DELETE /api/v2/files/{file_id}).
  *
  * There is no folder picker anywhere in this product, so this modal is the
- * only place a user can see — and remove — what they uploaded. Delete
- * cascades server-side: Milvus vectors, the S3 object, the Mongo chunks and
- * the registry row all go together.
+ * only place a user can see — and remove — what they uploaded. "View" opens
+ * the extracted text stored in MongoDB (see DocumentContentModal), which is
+ * what actually grounds generation; delete cascades server-side across the
+ * Milvus vectors, the Mongo chunks and the registry row.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import authService from '../services/authService';
 import { CONFIG } from '../config/config';
+import DocumentContentModal from './DocumentContentModal';
 
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return '';
@@ -59,10 +61,12 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
   const [error, setError] = useState(null);
   const [folder, setFolder] = useState(null);
   const [files, setFiles] = useState([]);
-  // `${fileId}:delete|download` — keeps one row's spinner local and stops
+  // `${fileId}:delete` — keeps one row's spinner local and stops
   // a double-tap firing the same destructive call twice.
   const [busyFile, setBusyFile] = useState(null);
   const [actionError, setActionError] = useState(null);
+  // { documentId, filename } of the row whose stored text is open, or null.
+  const [viewing, setViewing] = useState(null);
 
   const load = useCallback(async () => {
     if (!folderId) return;
@@ -124,8 +128,8 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
       );
       const body = await response.json().catch(() => ({}));
 
-      // The endpoint answers 200 with success:false when a sub-step (Milvus,
-      // S3, Mongo) failed, so the status alone is not enough.
+      // The endpoint answers 200 with success:false when a sub-step (Milvus
+      // or Mongo) failed, so the status alone is not enough.
       if (!response.ok || body.success === false) {
         const detail = body?.details?.errors?.join('; ') || body?.message || `HTTP ${response.status}`;
         throw new Error(detail);
@@ -140,44 +144,16 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
     }
   }, []);
 
-  const handleDownload = useCallback(async (file) => {
+  // "View" opens the extracted text held in MongoDB — the same text that was
+  // chunked and embedded — rather than fetching the original file back out of
+  // object storage. What the model sees is what the user is shown.
+  const handleView = useCallback((file) => {
     const documentId = file.document_id || file.id || file._id;
     if (!documentId) {
       setActionError('This file has no document id — cannot open it.');
       return;
     }
-
-    setBusyFile(`${documentId}:download`);
-    setActionError(null);
-    try {
-      // This endpoint hands back a presigned S3 URL (or, for text
-      // reconstructed out of chunks, a data: URL) — not the bytes.
-      const response = await authService.authenticatedFetch(
-        `${CONFIG.CITRA_SERVICE_URL}/api/documents/${encodeURIComponent(documentId)}/download`
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const { download_url: downloadUrl, filename } = await response.json();
-      if (!downloadUrl) throw new Error('No download URL returned.');
-
-      if (downloadUrl.startsWith('data:')) {
-        const anchor = document.createElement('a');
-        anchor.href = downloadUrl;
-        anchor.download = filename || file.filename || 'download';
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-      } else {
-        // Presigned URL is cross-origin, so the download attribute would be
-        // ignored and a fetch would hit CORS — hand it to the browser.
-        window.open(downloadUrl, '_blank', 'noopener');
-      }
-    } catch (e) {
-      console.error('❌ [FOLDER_DETAIL] Download failed:', e);
-      setActionError(`Download failed: ${e.message}`);
-    } finally {
-      setBusyFile(null);
-    }
+    setViewing({ documentId, filename: file.filename });
   }, []);
 
   return (
@@ -232,10 +208,7 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
                 ) : (
                   files.map((file) => {
                     const fileId = file.id || file._id;
-                    const documentId = file.document_id || fileId;
                     const isDeleting = busyFile === `${fileId}:delete`;
-                    const isDownloading = busyFile === `${documentId}:download`;
-                    const rowBusy = isDeleting || isDownloading;
 
                     return (
                       <View key={fileId || file.filename} style={[styles.fileRow, { borderColor: theme.borderColor }]}>
@@ -251,25 +224,20 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
                           {formatBytes(file.file_size_bytes)}
                         </Text>
 
-                        {isDownloading ? (
-                          <ActivityIndicator size="small" color={theme.primary} style={styles.rowAction} />
-                        ) : (
-                          <TouchableOpacity
-                            onPress={() => handleDownload(file)}
-                            disabled={rowBusy}
-                            style={styles.rowAction}
-                            accessibilityLabel={`Download ${file.filename || 'file'}`}
-                          >
-                            <Ionicons name="download-outline" size={18} color={theme.textSecondary} />
-                          </TouchableOpacity>
-                        )}
+                        <TouchableOpacity
+                          onPress={() => handleView(file)}
+                          disabled={isDeleting}
+                          style={styles.rowAction}
+                          accessibilityLabel={`View stored text of ${file.filename || 'file'}`}
+                        >
+                          <Ionicons name="eye-outline" size={18} color={theme.textSecondary} />
+                        </TouchableOpacity>
 
                         {isDeleting ? (
                           <ActivityIndicator size="small" color={theme.error || '#ef4444'} style={styles.rowAction} />
                         ) : (
                           <TouchableOpacity
                             onPress={() => handleDelete(file)}
-                            disabled={rowBusy}
                             style={styles.rowAction}
                             accessibilityLabel={`Delete ${file.filename || 'file'}`}
                           >
@@ -285,6 +253,14 @@ export default function FolderDetailModal({ visible, onClose, folderId, theme })
           )}
         </View>
       </View>
+
+      <DocumentContentModal
+        visible={!!viewing}
+        documentId={viewing?.documentId}
+        filename={viewing?.filename}
+        theme={theme}
+        onClose={() => setViewing(null)}
+      />
     </Modal>
   );
 }
