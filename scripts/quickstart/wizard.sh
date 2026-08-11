@@ -25,6 +25,16 @@ yes_no() { local q="$1" def="${2:-y}" a; a="$(ask "$q (y/n)" "$def")"; case "$a"
 
 rand()  { openssl rand -hex "$1" 2>/dev/null || head -c "$((${1}*2))" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 getkv() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- ; }
+# Quick-start DEFAULTS, as distinct from credentials. Written only when the key
+# is missing or empty, so re-running the wizard to update a key never reverts a
+# model you tuned by hand. Step 1 promises your values are preserved; before
+# this, model names were rewritten anyway, which silently moved LLM_SMALL_MODEL
+# and LLM_MEDIUM_MODEL off a cheap tier onto the expensive one and dropped
+# OpenRouter ':nitro' routing suffixes — on the highest-volume tier, unasked.
+setkv_default() {
+  [ -n "$(getkv "$1")" ] && return 0
+  setkv "$1" "$2"
+}
 setkv() {
   local k="$1" v="$2"
   if grep -qE "^$k=" "$ENV_FILE" 2>/dev/null; then
@@ -41,7 +51,8 @@ echo "Sovereign presentations, visual reports and long-form documents."
 # -- 1. .env ------------------------------------------------------------------
 hr; echo "$(b "Step 1/4 — environment file")"
 if [ -f "$ENV_FILE" ]; then
-  echo "Found an existing .env — keeping it (values you set are preserved)."
+  echo "Found an existing .env — keeping it. The keys you enter below are"
+  echo "updated; models and settings you tuned by hand are left as they are."
 else
   echo "Generating .env from .env.example with fresh random secrets..."
   cp .env.example "$ENV_FILE"
@@ -77,24 +88,30 @@ fi
 
 base="https://openrouter.ai/api/v1"
 model="deepseek/deepseek-v4-pro"
-setkv LLM_LARGE_BASE_URL  "$base"; setkv LLM_LARGE_MODEL  "$model"; setkv LLM_LARGE_API_KEY  "$key"
-setkv LLM_MEDIUM_BASE_URL "$base"; setkv LLM_MEDIUM_MODEL "$model"; setkv LLM_MEDIUM_API_KEY "$key"
-setkv LLM_SMALL_BASE_URL  "$base"; setkv LLM_SMALL_MODEL  "$model"; setkv LLM_SMALL_API_KEY  "$key"
-# Slide and report layout stays pinned to GLM-5.1 — it produces the best
+# A key is only valid against the endpoint it was issued for, so base URL and
+# key are rewritten together whenever a key is entered. The MODEL on each tier
+# is a starting point, not a credential — setkv_default leaves yours alone.
+setkv LLM_LARGE_BASE_URL  "$base"; setkv_default LLM_LARGE_MODEL  "$model"; setkv LLM_LARGE_API_KEY  "$key"
+setkv LLM_MEDIUM_BASE_URL "$base"; setkv_default LLM_MEDIUM_MODEL "$model"; setkv LLM_MEDIUM_API_KEY "$key"
+setkv LLM_SMALL_BASE_URL  "$base"; setkv_default LLM_SMALL_MODEL  "$model"; setkv LLM_SMALL_API_KEY  "$key"
+# Slide and report layout starts pinned to GLM-5.1 — it produces the best
 # structure of the models tested, and OpenRouter carries it.
-setkv PRESENTATION_LLM_MODEL "z-ai/glm-5.1"
-setkv PRINTABLE_LLM_MODEL    "z-ai/glm-5.1"
+setkv_default PRESENTATION_LLM_MODEL "z-ai/glm-5.1"
+setkv_default PRINTABLE_LLM_MODEL    "z-ai/glm-5.1"
 # Grounding. Without these the composers still draft, but from nothing but the
 # prompt — the one thing this product exists not to do.
+# Model and dimension must agree or the Milvus collection is built at the wrong
+# width, so both are defaults: swap the model in .env and your dimension is
+# still there next time you re-run this to change a key.
 setkv EMBEDDING_BASE_URL  "$base"
-setkv EMBEDDING_MODEL     "baai/bge-m3"
-setkv EMBEDDING_DIMENSION "768"
+setkv_default EMBEDDING_MODEL     "baai/bge-m3"
+setkv_default EMBEDDING_DIMENSION "768"
 setkv EMBEDDING_API_KEY   "$key"
 # Vision credentials are wired up even though the critique pass ships OFF
 # (CRITIC_VISION_ENABLED=false, set below), so switching it on later is a
 # one-line change rather than another trip through the wizard.
 setkv VISION_BASE_URL "$base"
-setkv VISION_MODEL    "qwen/qwen3-vl-32b-instruct"
+setkv_default VISION_MODEL    "qwen/qwen3-vl-32b-instruct"
 setkv VISION_API_KEY  "$key"
 echo "  [ok] one key configured for drafting and grounding"
 echo "       (vision credentials set too, but the critique pass stays off)"
@@ -137,10 +154,23 @@ fi
 # EDIT_CAPABLE_MODEL because it does generation AND editing, and Runware is the
 # only backend whose edit action works — swap it only for something that also
 # supports edits, or the composers' edit button starts failing.
-rmodel="$(ask "Runware model" "runware:400@1")"
+# On a re-run the offered default is whatever you are already using, so pressing
+# Enter keeps it. Offering the shipped id here would revert a deliberate choice
+# to the very keystroke that means "no change".
+rmodel_cur="$(getkv IMAGE_GEN_MODEL)"
+rmodel="$(ask "Runware model" "${rmodel_cur:-runware:400@1}")"
 setkv IMAGE_GEN_PROVIDER "runware"
 setkv IMAGE_GEN_API_KEY  "$rw"
 setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
+# Read ONLY by the openai-compatible provider (image_gen_providers.py); the
+# Runware provider ignores it. Cleared so a stale endpoint from a previous
+# provider cannot come back into play if IMAGE_GEN_PROVIDER is ever switched
+# back, and so the file stops implying that editing this URL redirects Runware
+# traffic — it does not. Announced, because it is the one value here that is
+# deliberately discarded rather than preserved.
+if [ -n "$(getkv IMAGE_GEN_BASE_URL)" ]; then
+  echo "  [note] cleared IMAGE_GEN_BASE_URL — Runware does not read it"
+fi
 setkv IMAGE_GEN_BASE_URL ""
 echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
 
@@ -148,7 +178,9 @@ echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have 
 # It re-renders each finished slide and sends the image to a vision model to
 # detect overlaps and patch layout — real cost on every generation, for a
 # problem most decks do not have. Turn it on only after seeing a glitch.
-setkv CRITIC_VISION_ENABLED "false"
+# A default, not a setting: if you turned the critique pass ON, coming back here
+# to update a key must not turn it off again behind you.
+setkv_default CRITIC_VISION_ENABLED "false"
 
 # -- 4. Bring it up ---------------------------------------------------------------
 hr; echo "$(b "Step 4/4 — bring up the stack")"
