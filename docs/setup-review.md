@@ -34,7 +34,13 @@ product.**
   works, so an alternative backend silently breaks the composers' edit button.
 - **Milvus** — grounding decks in your own documents is core, not an add-on. The
   RAM floor it imposes is the cost of the product working properly.
-- **MongoDB** — the document store. Not negotiable.
+- **MongoDB** — the application database. Not negotiable.
+- **MinIO** — object storage, and there are TWO instances for two different
+  jobs: `milvus-minio` is Milvus's own internal store (unpublished, private to
+  it), and `minio` on 9022/9023 is the application's — uploaded documents,
+  generated imagery, exports, the sandbox file cache. Both required; neither is
+  a duplicate of the other.
+- **Redis** — cache and coordination for the collaboration server.
 
 So the correct setup shape is exactly what the wizard already does: ask for the
 OpenRouter key, then the Runware key, and install the rest as required
