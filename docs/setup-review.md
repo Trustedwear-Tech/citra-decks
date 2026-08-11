@@ -17,56 +17,35 @@ your first account."*
 
 No org seeding, no admin bootstrap — self-signup. Correct for this product.
 
-## Finding 1 — Runware is presented as the only option; the code supports three
+## Findings 1 and 2 — WITHDRAWN (product decision, 2026-08-11)
 
-`image_gen_providers.py` implements **three** backends, selected by
-`IMAGE_GEN_PROVIDER`:
+The first draft of this review proposed making the image backend a choice and
+testing whether Milvus could be opt-in. Both are **rejected**, and the reasoning
+matters more than the suggestions did.
 
-| Provider | What it is |
-|---|---|
-| `runware` | cloud, via the Runware SDK |
-| `openai` | **any OpenAI-compatible `/images/generations` endpoint** — Together, Fal, DeepInfra, Nebius, or your own server |
-| `comfyui` | self-hosted ComfyUI |
+**Everything the wizard asks for is required. There is no opt-in in this
+product.**
 
-Its own docstring says the second is *"how you point citra-decks at a FLUX model
-without using Runware."*
+- **OpenRouter** — drafting, grounding, vision.
+- **Runware** — the imagery IS the product. A deck of text and charts is not what
+  citra-decks is for, so "skip and get plain slides" is not a degraded mode worth
+  offering at setup; it is a different, worse product. The code also backs this:
+  `EDIT_CAPABLE_MODEL` means Runware is the only backend whose *edit* action
+  works, so an alternative backend silently breaks the composers' edit button.
+- **Milvus** — grounding decks in your own documents is core, not an add-on. The
+  RAM floor it imposes is the cost of the product working properly.
+- **MongoDB** — the document store. Not negotiable.
 
-The wizard hard-fails on an empty Runware key and writes
-`IMAGE_GEN_PROVIDER=runware` unconditionally. It does mention the alternatives in
-prose — but its failure message tells the user that if they want a different
-backend they should *"set the IMAGE_GEN_ variables yourself in .env and skip this
-wizard."* A setup wizard whose answer to a supported configuration is "don't use
-the wizard" is the finding.
+So the correct setup shape is exactly what the wizard already does: ask for the
+OpenRouter key, then the Runware key, and install the rest as required
+infrastructure without asking. `IMAGE_GEN_PROVIDER=openai|comfyui` stays a
+documented `.env` escape hatch for someone who knows they want it and accepts
+losing edits — not a wizard branch.
 
-**There is a real constraint behind the default**, and it is well documented in
-the code: `EDIT_CAPABLE_MODEL` — Runware is the only backend whose *edit* action
-works, so swapping breaks the composers' edit button. That justifies Runware as
-the **recommended default**. It does not justify it being the only path.
-
-**Suggested:** make step 3 a choice — Runware (recommended, edit works), any
-OpenAI-compatible endpoint (bring your own key + base URL), self-hosted ComfyUI,
-or skip for now (text and charts only, imagery off). Say plainly that only
-Runware supports slide editing. Skipping should be permitted: the wizard's own
-text already admits decks render "text and charts only" without it, so the
-degraded path exists and works.
-
-## Finding 2 — Milvus is unconditional and it is the heaviest thing in the box
-
-`setup.sh` starts `milvus-etcd milvus-minio milvus` every time. The README's
-16 GB floor is attributed to Milvus specifically.
-
-Milvus serves RAG — grounding a draft in documents the user uploaded. A user
-whose first act is "make me a deck about X" from a prompt does not need it for
-that. And `start.sh` already treats a Milvus schema failure as non-fatal, warning
-that *"generation may be degraded"* — so a degraded-without-Milvus mode is
-already an acknowledged state.
-
-**Worth testing, not assuming:** can a deck be generated end to end with the
-Milvus trio stopped? If yes, an opt-in prompt ("Do you want to ground decks in
-your own documents? Adds ~3 containers and most of the RAM requirement") would
-cut the entry cost of this product substantially. If no, the 16 GB floor is
-irreducible and should be stated harder up front. I have not run this, so it is a
-question, not a recommendation.
+What this means for the review: the wizard is **not** over-asking. It asks for
+exactly the two things a user must supply, and everything else is a consequence
+of what the product does. The findings below stand on their own; they are about
+proving the install worked, not about asking for less.
 
 ## Finding 3 — no verify step
 
@@ -113,10 +92,9 @@ Worth saying, because most of this review is "ask for less":
 
 | # | Change | Size | Why |
 |---|---|---|---|
-| 1 | Offer the three image backends + skip | S | The code already supports it; the wizard is the only thing insisting on Runware |
-| 2 | Generate a one-slide deck as a verify step | S | Turns "started" into "works", exercising all three keys |
-| 3 | Test whether Milvus can be opt-in | M | Could remove most of the RAM floor for the common case |
-| 4 | Preflight | S | Fail in 5s, not 10min |
+| 1 | Generate a one-slide deck as a verify step | S | Turns "started" into "works", exercising both keys and the backend |
+| 2 | Preflight (RAM against the 16 GB floor, ports, disk) | S | Fail in 5s, not 10min — and the floor is real, since Milvus is required |
 
-None of this is structural. Unlike the decision system, decks does not have a
-path that silently fails to finish — it just asks for more than it needs.
+That is the whole list. The wizard asks for the right things in the right order;
+what it lacks is proof that the install actually works, and an early check that
+the machine can carry it.
