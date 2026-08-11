@@ -100,6 +100,10 @@ make start                     # or: bash scripts/quickstart/start.sh
 `.env.example` is the template. `make ps`, `make logs` and `make down` manage
 the running stack; see the `Makefile` for the full target list.
 
+If either phase fails, [`docs/troubleshooting.md`](docs/troubleshooting.md)
+brings each layer up by hand with a check after every step, so you can find the
+one unhappy container instead of re-running the lot.
+
 Once it's up:
 
 | Service | URL |
@@ -119,6 +123,64 @@ machine without a port collision. Override any of them via `.env`
 There is no seeded account — register your first user from the web UI's sign-up
 screen. `api/local_auth.py` issues its own JWTs (bcrypt-hashed passwords, a
 `users` collection); there is no separate user-service to stand up.
+
+## Architecture
+
+Ten containers in three layers. Worth a minute now — when something misbehaves,
+knowing which layer it lives in is most of the diagnosis.
+
+| Container | Layer | What it does | Port |
+|---|---|---|---|
+| `web` | edge | the UI — Presentation, Visual Report, MS-Word Report | **8094** |
+| `backend` | app | the API: drafting, composing, image generation, exports. OpenAPI at `/docs` | **8093** |
+| `collaboration-server` | app | real-time multi-user editing (Yjs over WebSocket) | **1234** |
+| `mongodb` | data | decks, reports, users — all application state | 27018 |
+| `mongodb-init-rs` | data | one-shot: initiates the replica set, then exits | — |
+| `redis` | data | cache, and collaboration coordination | 6382 |
+| `minio` | data | uploaded documents, generated imagery, exports | 9022 / **9023** console |
+| `milvus` | data | vector store — grounds drafts in your uploaded documents | 19531 / 9092 |
+| `milvus-etcd` | data | Milvus's metadata store, internal to it | — |
+| `milvus-minio` | data | Milvus's own object store — **not** the same as `minio` above | — |
+
+Two things that look like faults and are not: **`mongodb-init-rs` showing
+`Exited (0)` is success** — it is a one-shot job — and the **two MinIO
+containers are not duplicates**; one is Milvus's private store, the other holds
+your uploads and exports.
+
+Everything here is required. There is no cut-down mode: the imagery and the
+document grounding are what the product is.
+
+### What depends on what
+
+```
+  milvus-etcd ──┐
+                ├──> milvus ───┐
+  milvus-minio ─┘              │
+  mongodb ──> mongodb-init-rs ─┤
+  redis ───────────────────────┼──> backend ──┬──> web                   (8094)
+  minio ───────────────────────┘              └──> collaboration-server  (1234)
+```
+
+That is also the manual bring-up order, and it explains the most common
+confusion: a `backend` that restart-loops is nearly always a **data layer**
+problem, not a backend one.
+
+### How a request flows
+
+Your browser loads `web` on **8094**, which calls `backend` on **8093** for
+everything — drafting, images, exports. The editor separately holds a WebSocket
+to `collaboration-server` on **1234**.
+
+Those being two different connections is useful to know: if a deck loads and
+renders but live edits do not sync between browsers, only the collaboration
+server is implicated. Nothing else needs looking at.
+
+### When it does not work
+
+[`docs/troubleshooting.md`](docs/troubleshooting.md) has the manual bring-up
+step by step, a one-line health check per container, and a symptom-to-cause
+table. Written for exactly the case where the wizard failed and you want to
+bring each layer up yourself.
 
 ## What is here
 
