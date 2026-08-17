@@ -1,3 +1,13 @@
+<!--
+  Copyright (c) 2026 Trustedwear Tech Private Limited (https://citra-ai.com)
+  Author: Rohit Kumar Chandan
+  SPDX-License-Identifier: BUSL-1.1
+
+  Licensed under the Business Source License 1.1. Non-production use is granted;
+  production use requires a commercial licence until the Change Date, after
+  which this file converts to Apache-2.0. See LICENSE at the repository root.
+-->
+
 # Citra Decks
 
 **Sovereign presentations, visual reports and long-form documents — generated
@@ -304,7 +314,16 @@ what a real deployment needs that isn't here yet.
 
 ## Licence
 
-Apache-2.0. See `LICENSE`.
+Business Source License 1.1 (BUSL-1.1) -- source-available, not open source.
+Free to use, copy, and modify for any non-production purpose: development,
+testing, security review, internal evaluation, and pilots of up to 90 days on
+your own data. Production use requires a commercial licence. Each released
+version converts to Apache License 2.0 four years after its release date --
+automatically, with no action required from us and no way for us to withdraw
+it. For v0.1.0 the Change Date is **2030-08-17**. The vendored Citra Common
+packages (`citra-auth/`, `citra-cache/`, `citra-llm/`, `citra-mongo/`,
+`citra-queue/`, `citra-service-utils/`) are Apache-2.0 and stay Apache-2.0.
+See `LICENSE` and `NOTICE`.
 
 Citra is a product of Trustedwear Tech Private Limited · Incubated at IIT
 Patna · Funded by Startup India, MeitY & the Government of Bihar.

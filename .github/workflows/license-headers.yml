@@ -1,0 +1,46 @@
+# Copyright (c) 2026 Trustedwear Tech Private Limited (https://citra-ai.com)
+# Author: Rohit Kumar Chandan
+# SPDX-License-Identifier: BUSL-1.1
+#
+# Licensed under the Business Source License 1.1. Non-production use is granted;
+# production use requires a commercial licence until the Change Date, after
+# which this file converts to Apache-2.0. See LICENSE at the repository root.
+
+# Guard: every tracked source file carries the BUSL-1.1 notice.
+#
+# Borrowed from citra-decision-system, which uses the same licence tooling.
+# The scope comes from `git ls-files`, so this never reaches vendored or
+# third-party code -- including the Citra Common packages, which are
+# Apache-2.0 and excluded by scripts/license_headers.py.
+
+name: license headers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  headers:
+    name: BUSL-1.1 header on every tracked source file
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Exits 1 and names the files if any are missing.
+      - name: Check licence headers
+        run: python scripts/license_headers.py --check
+
+      - name: Unit tests for the licence tooling
+        run: |
+          pip install pytest pyyaml
+          python -m pytest scripts/test_license_headers.py \
+                           scripts/test_set_license_change_date.py -q

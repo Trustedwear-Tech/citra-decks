@@ -1,3 +1,11 @@
+# Copyright (c) 2026 Trustedwear Tech Private Limited (https://citra-ai.com)
+# Author: Rohit Kumar Chandan
+# SPDX-License-Identifier: BUSL-1.1
+#
+# Licensed under the Business Source License 1.1. Non-production use is granted;
+# production use requires a commercial licence until the Change Date, after
+# which this file converts to Apache-2.0. See LICENSE at the repository root.
+
 # ============================  Enhanced Chunked Document Service  =============================
 # Purpose: Complete document service with chunking, embedding, and vector storage
 # Features: Store documents in MongoDB chunks, create embeddings, and store in Milvus
