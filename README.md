@@ -134,6 +134,17 @@ There is no seeded account — register your first user from the web UI's sign-u
 screen. `api/local_auth.py` issues its own JWTs (bcrypt-hashed passwords, a
 `users` collection); there is no separate user-service to stand up.
 
+Three things to know about those accounts:
+
+- **All accounts are equal.** There is no admin role and no orgs — every
+  account is its own private workspace (its `personal_sa_id` owns its folders,
+  decks and reports).
+- **Registration is open** to anyone who can reach the port. Fine on a laptop;
+  on a shared network, front it with something that controls access.
+- **Password reset is not wired up.** The forgot-password endpoint is a
+  deliberate stub (it never sends anything), so a lost password means resetting
+  the hash in Mongo by hand. Keep your password safe.
+
 ## Architecture
 
 Ten containers in three layers. Worth a minute now — when something misbehaves,

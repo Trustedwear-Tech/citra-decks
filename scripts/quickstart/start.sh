@@ -116,8 +116,15 @@ citra-decks is running.
    Collaboration   ws://localhost:1234    (health: /health)
    MinIO console   http://localhost:${CONSOLE_PORT}
 
-   Register your first account from the web UI — there is no seeded admin;
-   the local auth backend (api/local_auth.py) creates accounts on demand.
+   Sign in: nothing is seeded — register your first account from the web
+   UI's sign-up screen (any email + password; accounts are created on
+   demand by api/local_auth.py, stored in this stack's own Mongo).
+
+   All accounts are equal: no admin role, no orgs — each account is its
+   own private workspace. Registration is open to anyone who can reach
+   this port, and password reset is NOT wired up (the forgot-password
+   endpoint is a stub) — run this on a network you trust, and keep your
+   password safe.
 
    Guide           README.md
 ----------------------------------------------------------------------------

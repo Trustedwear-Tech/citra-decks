@@ -201,4 +201,9 @@ fi
 
 hr
 echo "$(b "Done.")  Open  http://localhost:8094  and create your first account."
+echo "Nothing is seeded — sign-up is right on the login screen (any email +"
+echo "password). All accounts are equal: no admin role, no orgs — each account"
+echo "is its own private workspace. Registration is open to anyone who can"
+echo "reach the port, and password reset is not wired up, so run this on a"
+echo "network you trust and keep your password safe."
 echo "Re-run this wizard any time to change keys:  ./scripts/quickstart/wizard.sh"
