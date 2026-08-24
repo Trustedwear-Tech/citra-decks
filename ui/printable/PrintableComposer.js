@@ -2268,12 +2268,11 @@ const PrintableComposer = ({
       // Step 1: Call orchestrator to classify intent
 
       // Validation: Ensure we have a user ID
-      if (!userDeviceId) {
-        console.error('❌ [ORCHESTRATOR] Missing user ID (userDeviceId is null/undefined)');
-        Alert.alert('Authentication Error', 'User ID not found. Please try logging in again to use AI features.');
-        setIsAiProcessing(false);
-        return;
-      }
+      // No device-id gate: the shell passes userDeviceId: null, so this
+      // returned before issuing any request and the orchestrator simply
+      // never ran. Same dead check that emptied the artifact lists -- the
+      // backend never reads a device id; the bearer token authorises this
+      // and the server scopes it to the caller.
 
       // Helper to extract string goal from potentially nested objects
       const extractGoalString = (goalData) => {
@@ -2809,11 +2808,11 @@ const PrintableComposer = ({
       return handleAiEnhanceRef.current?.(instruction);
     }
 
-    if (!userDeviceId) {
-      Alert.alert('Authentication Error', 'User ID not found. Please log in again to use AI features.');
-      return;
-    }
-
+      // No device-id gate: the shell passes userDeviceId: null, so this
+      // returned before issuing any request and the assistant simply never
+      // answered. Same dead check that emptied the artifact lists -- the
+      // backend never reads a device id; the bearer token authorises this
+      // and the server scopes it to the caller.
     setIsAiProcessing(true);
     // New agent turn — canvas history coalesces every op batch of this turn into
     // one undo step. The state updates below re-render before the first batch,

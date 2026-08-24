@@ -105,23 +105,36 @@ def main() -> int:
         shot(page, "17-loaded", "the deck reopened from storage, slides intact")
 
         # ── ASK ─────────────────────────────────────────────────────────────
-        if not page.evaluate("""(t) => {
-          const ta = [...document.querySelectorAll('textarea')]
-            .find(e => /ask anything/i.test(e.placeholder||'') && e.offsetParent !== null);
-          if (!ta) return false;
-          ta.focus();
-          Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value')
-            .set.call(ta, t);
-          ta.dispatchEvent(new Event('input', {bubbles:true}));
-          return true;
-        }""", EDIT):
-            print("  [!!] AI chat box not found", file=sys.stderr); br.close(); return 1
+        # Type with REAL key events. Setting .value + an input event is enough
+        # for the login fields, but this box is a controlled RNW TextInput: the
+        # text appeared in the DOM while React's state stayed empty, so
+        # "Enhance" sent nothing and the backend never saw a request. The only
+        # symptom was a panel that never answered.
+        box = page.locator("textarea").filter(has_not=page.locator("[disabled]")).last
+        try:
+            box = page.get_by_placeholder("Ask anything", exact=False)
+            box.click(timeout=10000)
+            box.fill(EDIT, timeout=10000)
+        except Exception as exc:
+            print(f"  [!!] could not type into the AI chat box ({exc.__class__.__name__})",
+                  file=sys.stderr)
+            br.close(); return 1
         page.wait_for_timeout(600)
         shot(page, "18-ask", "the change, asked for in plain English")
 
-        # "Enhance" is the send button. Enter does nothing.
-        if not tap(page, "Enhance", timeout=10000):
-            print("  [!!] could not press Enhance (the send control)", file=sys.stderr)
+        # "Enhance" is the send button (PresentationComposer.js:5968 ->
+        # handleAgentEdit), and it is DISABLED while chatInput is empty -- which
+        # is why setting the textarea's .value achieved nothing: the DOM showed
+        # the text, React's state did not, and the button never enabled.
+        #
+        # Pressed with a real click rather than a dispatched pointer sequence.
+        # The synthetic one enabled-and-visible button still did not fire; a
+        # trusted event does.
+        try:
+            page.get_by_text("Enhance", exact=True).last.click(timeout=10000)
+        except Exception as exc:
+            print(f"  [!!] could not press Enhance ({exc.__class__.__name__})",
+                  file=sys.stderr)
             br.close(); return 1
         print("  waiting for the assistant...")
         try:
