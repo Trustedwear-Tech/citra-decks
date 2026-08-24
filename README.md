@@ -19,9 +19,9 @@ Three composers, one engine:
 - **Visual reports** — print-ready A4 documents
 - **Long-form documents** — Word-style reports drafted from your knowledge base
 
-Every figure traces back to a source. Not a generic slide tool: the numbers come
-from your files and your systems, and the deck can be regenerated when the data
-changes.
+Hand it your project — the documents, the spreadsheets, the standards you work
+to — and it writes from those. Every figure traces back to a source, and the
+deck can be regenerated when the data changes.
 
 <p align="center">
   <img alt="A generated five-slide deck open in the composer, with slide thumbnails, a generated cover image and the AI assistant panel"
@@ -35,7 +35,7 @@ attached — then editable element by element, or by asking.</i></p>
 
 |  |  |
 |---|---|
-| **It reads your documents** | Attach PDFs, spreadsheets, Word files or a URL. They are chunked and embedded into **your own** vector database, scoped per deck, and **stay until you delete them** — so the deck can be rebuilt or extended months later. → [Where your documents go in](#where-your-documents-go-in) |
+| **You give it the project, not a prompt** | Every tool takes an attachment. This takes your **project's material** — the spec, the spreadsheets, last quarter's report, the standards you work to — and keeps it as a knowledge store for that deck. The outline, every slide and every later edit are written from it, so the system knows what you are building rather than guessing from one paragraph. → [Where your documents go in](#where-your-documents-go-in) |
 | **The numbers are computed, not written** | For a spreadsheet the model is asked for a small Python script, which runs in a sandbox against your actual file; the **result** goes on the slide. A model asked to "sum column D" gives a confident wrong number. → [How a deck gets made](#how-a-deck-gets-made) |
 | **You change it by asking** | Reopen a deck and say what you want in ordinary words. It tells you what it worked out from your content before it writes anything. → [Come back to it](#come-back-to-it-and-change-it-by-asking) |
 | **It runs on your infrastructure** | Your Milvus, your object storage, your model endpoint. Point it at a local vLLM and nothing leaves your network. → [Why self-host this](#why-self-host-this) |
@@ -87,8 +87,16 @@ module map for all three composers.
 
 ### Where your documents go in
 
-A generic slide tool writes from what the model already knows. This writes from
-what your files say — so the first question it asks is what to read.
+Attaching a file is not the point — every tool does that, for one prompt, and
+forgets it. The point is that your project's material becomes a **standing
+knowledge store for that deck**: the spec, the spreadsheets, the standards you
+work to, last quarter's numbers. The outline is built from it, every slide is
+written from it, and the edit you ask for in three weeks still reads it.
+
+That is what "grounded" has to mean for corporate work. A board pack, a credit
+memo or an incident report is not a writing task — it is a summarising task
+over material that already exists, and the tool either has that material or it
+is inventing.
 
 **Before the deck exists**, on the goal step: attach the material and it is
 chunked, embedded and stored before a single slide is written. The outline is
