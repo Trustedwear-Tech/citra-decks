@@ -37,7 +37,7 @@ Citra Decks is Apache-2.0 and free to run on your own infrastructure, forever.
 Sponsorship funds maintenance, the documentation, and the hosted demo people try
 before they self-host.
 
-**[→ Support this project](https://rzp.io/rzp/Yp92GE2l)**
+**[→ Support this project](https://citra-ai.com/open-source)**
 
 <sub>Contributions go to Trustedwear Tech Private Limited, which maintains this
 project. They are not tax-exempt donations, and they buy no licence, warranty,
