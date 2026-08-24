@@ -35,7 +35,7 @@ attached — then editable element by element, or by asking.</i></p>
 
 |  |  |
 |---|---|
-| **You give it the project, not a prompt** | Every tool takes an attachment. This takes your **project's material** — the spec, the spreadsheets, last quarter's report, the standards you work to — and keeps it as a knowledge store for that deck. The outline, every slide and every later edit are written from it, so the system knows what you are building rather than guessing from one paragraph. → [Where your documents go in](#where-your-documents-go-in) |
+| **You give it the project, not a prompt** | Every tool takes an attachment. This takes your **project's material** — the spec, the spreadsheets, last quarter's report, the standards you work to — and keeps it as a knowledge store for that deck. The outline and every slide are written from it, so the system knows what you are building rather than guessing from one paragraph. → [Where your documents go in](#where-your-documents-go-in) |
 | **The numbers are computed, not written** | For a spreadsheet the model is asked for a small Python script, which runs in a sandbox against your actual file; the **result** goes on the slide. A model asked to "sum column D" gives a confident wrong number. → [How a deck gets made](#how-a-deck-gets-made) |
 | **You change it by asking** | Reopen a deck and say what you want in ordinary words. It tells you what it worked out from your content before it writes anything. → [Come back to it](#come-back-to-it-and-change-it-by-asking) |
 | **It runs on your infrastructure** | Your Milvus, your object storage, your model endpoint. Point it at a local vLLM and nothing leaves your network. → [Why self-host this](#why-self-host-this) |
@@ -91,7 +91,14 @@ Attaching a file is not the point — every tool does that, for one prompt, and
 forgets it. The point is that your project's material becomes a **standing
 knowledge store for that deck**: the spec, the spreadsheets, the standards you
 work to, last quarter's numbers. The outline is built from it, every slide is
-written from it, and the edit you ask for in three weeks still reads it.
+written from it.
+
+> **Known gap (being fixed):** a saved deck currently loses the link to its
+> data store — the save sends `folder_ids` while the server persists
+> `folder_id`, so it writes null. The documents are still in your Milvus,
+> but a deck reopened later cannot see them, and the toolbar's data-store
+> view opens empty. Generation from attached files works; re-grounding an
+> existing deck does not, yet.
 
 That is what "grounded" has to mean for corporate work. A board pack, a credit
 memo or an incident report is not a writing task — it is a summarising task

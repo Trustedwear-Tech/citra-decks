@@ -368,6 +368,12 @@ export const usePresentationPersistence = () => {
         style: presentationData.presentationMetadata?.style || null,
         thumbnail: presentationData.thumbnail || null, // First slide thumbnail for presentation list
         folder_ids: presentationData.folderIds || null,
+        // SavePresentationRequest declares folder_id (singular) -- "the
+        // presentation's dedicated folder, one per artifact". Only folder_ids
+        // was ever sent, so Pydantic dropped it as unknown and stored null:
+        // the deck lost its data store on save. The vault viewer then opened
+        // empty and a later edit had no documents to read.
+        folder_id: (presentationData.folderIds && presentationData.folderIds[0]) || null,
       };
 
       // Aggressive Logging: Payload Analysis

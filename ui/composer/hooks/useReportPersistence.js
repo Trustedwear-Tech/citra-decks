@@ -300,6 +300,10 @@ export const useReportPersistence = () => {
         metadata: {
           ...(reportData.reportMetadata || {}),
           folder_ids: reportData.folderIds || null,
+          // Singular folder_id is what the server persists (see
+          // usePresentationPersistence for the full note); sending only the
+          // plural silently detached the artifact from its data store.
+          folder_id: (reportData.folderIds && reportData.folderIds[0]) || null,
         },
         thumbnail: reportData.thumbnail || null  // First page thumbnail for report list
       };
