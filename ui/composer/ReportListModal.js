@@ -84,8 +84,11 @@ const ReportListModal = ({
 
     // Fetch reports from server
     const fetchReports = useCallback(async () => {
-        if (!userDeviceId) return;
-
+        // No device-id gate. The shell passes userDeviceId: null, so this used
+        // to return before fetching -- the list rendered empty and anything you
+        // saved was unreachable from the UI even though the server had it. The
+        // request is authorised by the bearer token and scoped to the caller
+        // server-side; X-Device-ID is not read anywhere in the backend.
         try {
             setIsLoading(true);
             setError(null);

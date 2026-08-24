@@ -36,6 +36,55 @@ DEFAULT_DOWNLOAD_CORS_ORIGIN = os.getenv("DOWNLOAD_CORS_ALLOW_ORIGIN", "http://l
 _client_cache: Optional[boto3.client] = None
 
 
+
+# Cached separately from _client_cache: same credentials, different endpoint.
+_presign_client_cache = None
+
+
+def _get_presign_client():
+    """Client used to SIGN urls that are handed to a browser.
+
+    BUCKET_ENDPOINT_URL is where the SERVER reaches object storage
+    (http://minio:9000 inside compose). A browser cannot resolve that, so a URL
+    signed by the ordinary client is unusable the moment it leaves the backend
+    -- which is exactly how every image on a reloaded deck went missing.
+
+    SigV4 signs the Host header, so the host cannot be rewritten after signing;
+    the signature has to be computed against the public address in the first
+    place. Hence a second client.
+
+    Falls back to the ordinary client when BUCKET_PUBLIC_ENDPOINT_URL is unset,
+    which is correct for real AWS S3 (its endpoint is already public) and leaves
+    existing deployments unchanged.
+    """
+    global _presign_client_cache
+
+    public_url = os.getenv('BUCKET_PUBLIC_ENDPOINT_URL', '').strip()
+    if not public_url:
+        return _get_client()
+
+    if _presign_client_cache is None:
+        access_key = os.getenv('BUCKET_ACCESS_KEY')
+        secret_key = os.getenv('BUCKET_SECRET_KEY')
+        region = os.getenv('BUCKET_REGION', 'us-east-1')
+        if not access_key or not secret_key:
+            raise ValueError("Bucket credentials not found in environment variables")
+        _presign_client_cache = boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region,
+            endpoint_url=public_url,
+            # Path style for the same reason the main client uses it: a custom
+            # endpoint means an S3-compatible service, where "<bucket>.<host>"
+            # does not resolve.
+            config=Config(signature_version='s3v4',
+                          s3={'addressing_style': 'path'}),
+        )
+        logger.info(f"✅ Presign client initialized (public endpoint: {public_url})")
+    return _presign_client_cache
+
+
 def get_environment_prefix() -> str:
     """Get environment prefix for bucket folder structure."""
     env = os.getenv("ENVIRONMENT", "dev").lower()
@@ -450,7 +499,10 @@ def generate_download_url(s3_key: str, expiry_seconds: int = 1800) -> str:
             s3_key = f"{env_prefix}/{s3_key.lstrip('/')}"
         
         # Generate presigned URL with inline disposition for browser viewing
-        presigned_url = client.generate_presigned_url(
+        # Signed by the PUBLIC-endpoint client: this URL is handed to a
+        # browser, and one signed for http://minio:9000 is unusable outside
+        # the compose network (see _get_presign_client).
+        presigned_url = _get_presign_client().generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': bucket_name, 
