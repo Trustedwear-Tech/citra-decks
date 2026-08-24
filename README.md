@@ -31,6 +31,19 @@ deck can be regenerated when the data changes.
 <p align="center"><i>Written from a one-paragraph brief and the documents you
 attached — then editable element by element, or by asking.</i></p>
 
+## Support this project
+
+Citra Decks is Apache-2.0 and free to run on your own infrastructure, forever.
+Sponsorship funds maintenance, the documentation, and the hosted demo people try
+before they self-host.
+
+**[→ Support this project](https://rzp.io/rzp/Yp92GE2l)**
+
+<sub>Contributions go to Trustedwear Tech Private Limited, which maintains this
+project. They are not tax-exempt donations, and they buy no licence, warranty,
+support entitlement or influence over the roadmap — the project stays
+Apache-2.0 either way.</sub>
+
 ### What makes it different
 
 |  |  |
