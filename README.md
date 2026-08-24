@@ -23,6 +23,24 @@ Every figure traces back to a source. Not a generic slide tool: the numbers come
 from your files and your systems, and the deck can be regenerated when the data
 changes.
 
+<p align="center">
+  <img alt="A generated five-slide deck open in the composer, with slide thumbnails, a generated cover image and the AI assistant panel"
+       src="assets/screens/07-composer.png" width="100%">
+</p>
+
+<p align="center"><i>Written from a one-paragraph brief and the documents you
+attached — then editable element by element, or by asking.</i></p>
+
+### What makes it different
+
+|  |  |
+|---|---|
+| **It reads your documents** | Attach PDFs, spreadsheets, Word files or a URL. They are chunked and embedded into **your own** vector database, scoped per deck, and **stay until you delete them** — so the deck can be rebuilt or extended months later. → [Where your documents go in](#where-your-documents-go-in) |
+| **The numbers are computed, not written** | For a spreadsheet the model is asked for a small Python script, which runs in a sandbox against your actual file; the **result** goes on the slide. A model asked to "sum column D" gives a confident wrong number. → [How a deck gets made](#how-a-deck-gets-made) |
+| **You change it by asking** | Reopen a deck and say what you want in ordinary words. It tells you what it worked out from your content before it writes anything. → [Come back to it](#come-back-to-it-and-change-it-by-asking) |
+| **It runs on your infrastructure** | Your Milvus, your object storage, your model endpoint. Point it at a local vLLM and nothing leaves your network. → [Why self-host this](#why-self-host-this) |
+
+
 ## Why self-host this
 
 Presentation and document tools are where confidential material goes to get
