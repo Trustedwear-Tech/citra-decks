@@ -137,15 +137,26 @@ def main() -> int:
                   file=sys.stderr)
             br.close(); return 1
         print("  waiting for the assistant...")
+        # The send button is the progress indicator: it reads "Stop" while the
+        # agent loop runs and returns to "Enhance" when it finishes. Waiting on
+        # text appearing in the panel is not enough -- the model's reasoning
+        # streams in long before the slide lands, and capturing then shows a
+        # half-applied deck with the button still on Stop.
         try:
             page.wait_for_function(
-                "(t) => !document.body.innerText.includes('Review all slides and suggest')"
-                " || /Apply|Applied|added|Added/.test(document.body.innerText)",
-                arg=EDIT, timeout=300000)
+                "() => document.body.innerText.includes('Stop')", timeout=60000)
         except Exception:
-            print("  [!!] no visible answer from the assistant", file=sys.stderr)
-        page.wait_for_timeout(5000)
-        shot(page, "19-answer", "what it proposes, before anything changes")
+            print("  [!!] the agent never started", file=sys.stderr)
+            br.close(); return 1
+        print("  agent running...")
+        try:
+            page.wait_for_function(
+                "() => !document.body.innerText.includes('Stop')", timeout=420000)
+        except Exception:
+            print("  [!!] agent still running after 7 min -- capturing anyway",
+                  file=sys.stderr)
+        page.wait_for_timeout(6000)
+        shot(page, "19-answer", "the request, and what it decided to do")
 
         for label in ("Apply to Canvas", "Apply"):
             if tap(page, label, timeout=6000):

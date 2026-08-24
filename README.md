@@ -135,6 +135,45 @@ and Present/export when you are done.
 
 <p align="center"><i>Nothing here is a preview — it is the deck, editable element by element.</i></p>
 
+### Come back to it, and change it by asking
+
+A deck you cannot reopen is a screenshot. This is the other half of the loop.
+
+**6 — Reopen it.** Decks are saved explicitly — the save icon in the toolbar,
+never automatically — and come back with their slides, images and layout
+intact.
+
+<p align="center">
+  <img alt="A saved five-slide deck reopened from storage, thumbnails and cover image intact"
+       src="assets/screens/17-loaded.png" width="100%">
+</p>
+
+<p align="center"><i>Reopened after a full page reload. The images are served from your own object storage (MinIO locally, S3 or anything S3-compatible in production).</i></p>
+
+
+**7 — Ask for the change in the same words you'd use with a colleague.** No
+selecting elements first, no menus to find. The assistant can see the whole
+deck.
+
+<p align="center">
+  <img alt="The AI assistant panel with a plain-English instruction typed in: add a summary slide at the end with the three things to do first"
+       src="assets/screens/18-ask.png" width="100%">
+</p>
+
+<p align="center"><i>The deck is the context. "At the end", "the three things to do first" — it resolves those against what is actually on the slides.</i></p>
+
+
+**8 — It tells you what it worked out, then does it.** The reply is not a
+progress bar: it says which three things it took from your content and why,
+before it writes anything.
+
+<p align="center">
+  <img alt="The assistant's reply naming the three first steps it drew from the deck, and confirming it added a summary slide — the deck now showing six slides"
+       src="assets/screens/20-applied.png" width="100%">
+</p>
+
+<p align="center"><i>Slide count goes 5 → 6. It named the steps from the deck's own content (find your bad actors, instrument bottlenecks, pilot then scale) and matched the existing dark theme rather than inventing a new look — then offered the next things you might want.</i></p>
+
 
 ## Quickstart
 
