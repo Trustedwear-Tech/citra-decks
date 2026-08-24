@@ -67,6 +67,75 @@ a vision model, and patched** from that critique. It is why the output does not
 look like a wall of bullets. `ARCHITECTURE.md` has the full pipeline and the
 module map for all three composers.
 
+### What that looks like
+
+One unbroken run on a local install — the goal below produced the outline
+below it, which produced the deck at the end. Reproduce it with
+[`scripts/capture_screens.py`](scripts/capture_screens.py).
+
+**1 — Pick what you are making.** Slides, a visual report, or a Word-style
+document. Same pipeline, three composers.
+
+<p align="center">
+  <img alt="The Citra Decks landing page offering Presentation, Visual Report and MS-Word Report"
+       src="assets/screens/00-landing.png" width="100%">
+</p>
+
+<p align="center"><i>Accounts are local — citra-decks issues its own JWTs, there is no external auth service to stand up.</i></p>
+
+
+**2 — Say what the deck is for.** Not a topic — a goal, with the audience and
+the length you want. This is the only prose you have to write.
+
+<p align="center">
+  <img alt="The Create Presentation wizard, goal step, with a brief about predictive maintenance"
+       src="assets/screens/03-goal.png" width="100%">
+</p>
+
+<p align="center"><i>Point it at your uploaded documents and spreadsheets here too; retrieval and computation both key off this step.</i></p>
+
+
+**3 — Review the outline before anything is built.** Reorder, edit, delete, add.
+Ten slide generations are expensive; the cheap moment to disagree is now.
+
+<p align="center">
+  <img alt="The generated slide outline: ten titles with a paragraph of intent under each"
+       src="assets/screens/04-outline.png" width="100%">
+</p>
+
+<p align="center"><i>Each slide arrives with its argument stated, so you are approving a structure rather than a list of titles.</i></p>
+
+
+**4 — Choose a look, then let it write.** Slides are generated in parallel, each
+one rendered, critiqued by a vision model, and patched from that critique.
+
+<p align="center">
+  <img alt="The template picker"
+       src="assets/screens/05-template.png" width="100%">
+</p>
+
+<p align="center"><i>The look is applied at generation time, not painted on afterwards.</i></p>
+
+<p align="center">
+  <img alt="Slides being generated, with progress shown per slide"
+       src="assets/screens/06-generating.png" width="100%">
+</p>
+
+<p align="center"><i>Ten real model calls. This is the slow part, and the part that is doing the work.</i></p>
+
+
+**5 — Then it is yours.** A normal editable canvas: every element selectable,
+the AI panel alongside for whole-deck edits ("add a summary slide at the end"),
+and Present/export when you are done.
+
+<p align="center">
+  <img alt="The finished ten-slide deck in the composer, with thumbnails, a generated cover image and the AI assistant panel"
+       src="assets/screens/07-composer.png" width="100%">
+</p>
+
+<p align="center"><i>Nothing here is a preview — it is the deck, editable element by element.</i></p>
+
+
 ## Quickstart
 
 ### Prerequisites

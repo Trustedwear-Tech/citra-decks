@@ -866,6 +866,21 @@ const PrintableComposer = ({
     border: '#e0e0e0',
     isDark: false,
   };
+  // Both side panels below are FIXED light surfaces (styles.sidebar with a
+  // hardcoded '#ffffff' at each call site), while safeTheme is the APP theme --
+  // dark. Taking label colour from it painted every caption and chip at
+  // ~#e0e0e0 on white: visible as shapes, reading as disabled. Same fix and
+  // same reasoning as TOOLBAR_CHROME in PrintableSharedToolbar, which landed on
+  // the toolbar only -- which is why the bar looked right and the panels either
+  // side of it looked switched off.
+  const panelTheme = {
+    ...safeTheme,
+    text: '#374151',          // ~10.4:1 on white
+    textSecondary: '#6B7280', // ~4.8:1 -- clears the 4.5:1 WCAG AA floor
+    border: '#E5E7EB',
+    surface: '#F9FAFB',
+    isDark: false,
+  };
 
 
 
@@ -5114,7 +5129,7 @@ const PrintableComposer = ({
 
           {/* Sidebar - PAGE list */}
           {!mobileViewOnly && (
-            <View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: '#ffffff', borderRightColor: safeTheme.border }]}>
+            <View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: '#ffffff', borderRightColor: panelTheme.border }]}>
 
               {/* Title Area Above PAGE Nav */}
               <View style={{ marginBottom: 16, paddingHorizontal: 4 }}>
@@ -5124,16 +5139,16 @@ const PrintableComposer = ({
                   type="printable"
                   style={{ marginBottom: 8 }}
                 />
-                <Text style={[styles.sidebarTitle, { color: safeTheme.text, fontSize: 16 }]} numberOfLines={1}>
+                <Text style={[styles.sidebarTitle, { color: panelTheme.text, fontSize: 16 }]} numberOfLines={1}>
                   {printableTitle}
                 </Text>
                 {vaultDisplayName && (
-                  <Text style={{ fontSize: 11, color: safeTheme.text, opacity: 0.6, fontStyle: 'italic', marginBottom: 2 }}>
+                  <Text style={{ fontSize: 11, color: panelTheme.text, opacity: 0.6, fontStyle: 'italic', marginBottom: 2 }}>
                     Data Store: {vaultDisplayName}
                   </Text>
                 )}
                 {lastSaved && (
-                  <Text style={{ fontSize: 10, color: safeTheme.textSecondary }}>
+                  <Text style={{ fontSize: 10, color: panelTheme.textSecondary }}>
                     {isSaving ? 'Saving...' : `Saved ${new Date(lastSaved).toLocaleTimeString()}`}
                   </Text>
                 )}
@@ -5144,7 +5159,7 @@ const PrintableComposer = ({
                       contentType="printable"
                       sourceId={currentPrintableId}
                       title={printableTitle}
-                      theme={safeTheme}
+                      theme={panelTheme}
                       size="small"
                       showLabel={true}
                       apiConfig={apiConfig}
@@ -5237,9 +5252,9 @@ const PrintableComposer = ({
                     onPress={goToPrevPAGE}
                     style={{ opacity: currentPAGEIndex <= 0 ? 0.3 : 1, padding: 4 }}
                   >
-                    <Ionicons name="chevron-back" size={18} color={safeTheme.text} />
+                    <Ionicons name="chevron-back" size={18} color={panelTheme.text} />
                   </TouchableOpacity>
-                  <Text style={[styles.sidebarTitle, { color: safeTheme.text, fontSize: 13, marginBottom: 0 }]}>
+                  <Text style={[styles.sidebarTitle, { color: panelTheme.text, fontSize: 13, marginBottom: 0 }]}>
                     Page {currentPAGEIndex + 1}/{PAGES.length}
                   </Text>
                   <TouchableOpacity
@@ -5247,19 +5262,19 @@ const PrintableComposer = ({
                     onPress={goToNextPAGE}
                     style={{ opacity: currentPAGEIndex >= PAGES.length - 1 ? 0.3 : 1, padding: 4 }}
                   >
-                    <Ionicons name="chevron-forward" size={18} color={safeTheme.text} />
+                    <Ionicons name="chevron-forward" size={18} color={panelTheme.text} />
                   </TouchableOpacity>
                 </View>
 
                 {/* 2. View Toggle Button */}
-                <Tooltip text={PAGEPanelViewMode === 'thumbnail' ? 'Switch to List View' : 'Switch to Thumbnail View'} theme={safeTheme}>
+                <Tooltip text={PAGEPanelViewMode === 'thumbnail' ? 'Switch to List View' : 'Switch to Thumbnail View'} theme={panelTheme}>
                   <TouchableOpacity
                     style={{
                       padding: 6,
-                      backgroundColor: safeTheme.background,
+                      backgroundColor: panelTheme.background,
                       borderRadius: 6,
                       borderWidth: 1,
-                      borderColor: safeTheme.border || '#e0e0e0',
+                      borderColor: panelTheme.border || '#e0e0e0',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -5268,7 +5283,7 @@ const PrintableComposer = ({
                     <Ionicons
                       name={PAGEPanelViewMode === 'thumbnail' ? 'list-outline' : 'grid-outline'}
                       size={16}
-                      color={safeTheme.text}
+                      color={panelTheme.text}
                     />
                   </TouchableOpacity>
                 </Tooltip>
@@ -5276,7 +5291,7 @@ const PrintableComposer = ({
                 {/* 3. Add Page Button */}
                 <TouchableOpacity
                   style={[styles.addPAGEBtn, {
-                    backgroundColor: safeTheme.primary,
+                    backgroundColor: panelTheme.primary,
                     height: 32,
                     width: '100%',
                     alignItems: 'center',
@@ -5300,7 +5315,7 @@ const PrintableComposer = ({
               style={styles.resizer}
               {...panResponder.panHandlers}
             >
-              <View style={{ width: 1, height: '100%', backgroundColor: safeTheme.border, marginLeft: 2 }} />
+              <View style={{ width: 1, height: '100%', backgroundColor: panelTheme.border, marginLeft: 2 }} />
             </View>
           )}
 
@@ -5316,7 +5331,7 @@ const PrintableComposer = ({
           >
             {/* Shared toolbar – always visible so users know they can edit */}
             <PrintableSharedToolbar
-                theme={safeTheme}
+                theme={panelTheme}
                 activeCanvasRef={activeCanvasRef}
                 selectionInfo={selectionInfo}
                 onOpenStylePicker={() => setShowStylePicker(true)}
@@ -5385,9 +5400,9 @@ const PrintableComposer = ({
                       marginBottom: 24,
                       alignItems: 'center',
                       borderLeftWidth: 4,
-                      borderLeftColor: isActivePage ? safeTheme.primary : 'transparent',
+                      borderLeftColor: isActivePage ? panelTheme.primary : 'transparent',
                       borderRadius: 8,
-                      backgroundColor: isActivePage ? (safeTheme.primary + '08') : 'transparent',
+                      backgroundColor: isActivePage ? (panelTheme.primary + '08') : 'transparent',
                       paddingLeft: 8,
                       paddingRight: 4,
                       paddingVertical: 8,
@@ -5396,7 +5411,7 @@ const PrintableComposer = ({
                     {/* Page label */}
                     <Text style={{
                       fontSize: 11,
-                      color: isActivePage ? safeTheme.primary : (safeTheme.textSecondary || '#888'),
+                      color: isActivePage ? panelTheme.primary : (panelTheme.textSecondary || '#888'),
                       marginBottom: 6,
                       fontWeight: isActivePage ? '600' : '400',
                     }}>
@@ -5417,7 +5432,7 @@ const PrintableComposer = ({
                       printableStyle={printableStyle}
                       iconSet={printableStyle?.iconSet}
                       awareness={collaboration?.awareness}
-                      theme={safeTheme}
+                      theme={panelTheme}
                       isEditable={true}
                       hideToolbar={true}
                       selectedElementId={isActivePage ? selectedElementId : null}
@@ -5565,7 +5580,7 @@ const PrintableComposer = ({
               style={styles.resizer}
               {...rightPanResponder.panHandlers}
             >
-              <View style={{ width: 1, height: '100%', backgroundColor: safeTheme.border, marginLeft: 2 }} />
+              <View style={{ width: 1, height: '100%', backgroundColor: panelTheme.border, marginLeft: 2 }} />
             </View>
           )}
 
@@ -5580,7 +5595,7 @@ const PrintableComposer = ({
                   width: rightSidebarWidth,
                   backgroundColor: '#ffffff',
                   borderLeftWidth: 1,
-                  borderLeftColor: safeTheme.border,
+                  borderLeftColor: panelTheme.border,
                   borderRightWidth: 0,
                   paddingBottom: 0,
                 }
@@ -5631,7 +5646,7 @@ const PrintableComposer = ({
                       chatting, the chat history takes the full panel height. */}
                   {aiChatMessages.length === 0 && (
                   <ScrollView style={{ flex: 1, marginBottom: 10 }}>
-                    <Text style={{ fontSize: 13, color: safeTheme.textSecondary, lineHeight: 20 }}>
+                    <Text style={{ fontSize: 13, color: panelTheme.textSecondary, lineHeight: 20 }}>
                       I can see your whole document — edit, add, delete or reorder pages, restyle, review. Try:
                     </Text>
                     <View style={{ marginTop: 10, gap: 8 }}>
@@ -5644,9 +5659,9 @@ const PrintableComposer = ({
                         <TouchableOpacity
                           key={example}
                           onPress={() => !isAiProcessing && !isAiLocked && handleAgentEdit(example.replace(/^\S+\s/, ''))}
-                          style={{ backgroundColor: safeTheme.background, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: safeTheme.border }}
+                          style={{ backgroundColor: panelTheme.background, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: panelTheme.border }}
                         >
-                          <Text style={{ fontSize: 12, color: safeTheme.text }}>{example}</Text>
+                          <Text style={{ fontSize: 12, color: panelTheme.text }}>{example}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -5907,14 +5922,14 @@ const PrintableComposer = ({
                     <View style={{ gap: 8, marginBottom: 10 }}>
                       {/* Top Row: Attachment + Toggle */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Tooltip text="Attach File" theme={safeTheme}>
+                        <Tooltip text="Attach File" theme={panelTheme}>
                           <TouchableOpacity
                             style={{
                               padding: 10,
-                              backgroundColor: safeTheme.background,
+                              backgroundColor: panelTheme.background,
                               borderRadius: 8,
                               borderWidth: 1,
-                              borderColor: safeTheme.border,
+                              borderColor: panelTheme.border,
                               justifyContent: 'center',
                               alignItems: 'center',
                               height: 36,
@@ -5927,7 +5942,7 @@ const PrintableComposer = ({
                               }
                             }}
                           >
-                            <Ionicons name="attach" size={18} color={safeTheme.textSecondary || '#666'} />
+                            <Ionicons name="attach" size={18} color={panelTheme.textSecondary || '#666'} />
                           </TouchableOpacity>
                         </Tooltip>
 
@@ -5940,7 +5955,7 @@ const PrintableComposer = ({
                             <View key={img.id} style={{ position: 'relative' }}>
                               <Image
                                 source={{ uri: img.previewUri }}
-                                style={{ width: 44, height: 44, borderRadius: 8, borderWidth: 1, borderColor: safeTheme.border || '#E2E8F0' }}
+                                style={{ width: 44, height: 44, borderRadius: 8, borderWidth: 1, borderColor: panelTheme.border || '#E2E8F0' }}
                                 resizeMode="cover"
                               />
                               <TouchableOpacity
@@ -5959,14 +5974,14 @@ const PrintableComposer = ({
 
                         <TextInput
                           style={[styles.aiChatInput, {
-                            backgroundColor: isAiLocked ? '#F3F4F6' : safeTheme.background,
-                            color: isAiLocked ? '#9CA3AF' : safeTheme.text,
-                            borderColor: safeTheme.border,
+                            backgroundColor: isAiLocked ? '#F3F4F6' : panelTheme.background,
+                            color: isAiLocked ? '#9CA3AF' : panelTheme.text,
+                            borderColor: panelTheme.border,
                             flex: 1,
                             marginBottom: 0 // Remove bottom margin as container handles it
                           }]}
                           placeholder={isAiLocked ? "AI is currently locked..." : (editMode === 'PAGE' ? 'Ask anything — edit, add, reorder, review pages…' : `Edit ${getElementTypeLabel(selectedElements).toLowerCase()}...`)}
-                          placeholderTextColor={safeTheme.textSecondary || '#888'}
+                          placeholderTextColor={panelTheme.textSecondary || '#888'}
                           value={chatInput}
                           onChangeText={(text) => {
                             setChatInput(text);
@@ -5988,7 +6003,7 @@ const PrintableComposer = ({
                         />
                       </View>
                       <TouchableOpacity
-                        style={[styles.aiChatBtn, { backgroundColor: isAiProcessing ? '#EF4444' : safeTheme.primary, opacity: isAiProcessing ? 1 : (((chatInput.trim() || aiPastedImages.length > 0) && !isAiLocked) ? 1 : 0.5) }]}
+                        style={[styles.aiChatBtn, { backgroundColor: isAiProcessing ? '#EF4444' : panelTheme.primary, opacity: isAiProcessing ? 1 : (((chatInput.trim() || aiPastedImages.length > 0) && !isAiLocked) ? 1 : 0.5) }]}
                         onPress={() => isAiProcessing ? handleStopAgent() : handleAgentEdit()}
                         disabled={isAiProcessing ? false : ((!chatInput.trim() && aiPastedImages.length === 0) || isAiLocked)}
                       >
@@ -6015,7 +6030,7 @@ const PrintableComposer = ({
                   onSelectElement={handleSelectElement}
                   onUpdateElement={handleElementUpdate}
                   onDeleteElement={handleDeleteElement}
-                  theme={safeTheme}
+                  theme={panelTheme}
                 />
               )}
             </View>

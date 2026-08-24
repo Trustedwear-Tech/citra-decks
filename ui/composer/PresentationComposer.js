@@ -882,6 +882,24 @@ const PresentationComposer = ({
     border: '#e0e0e0',
     isDark: false,
   };
+  // Both side panels below are FIXED light surfaces (styles.sidebar is rendered
+  // with backgroundColor '#ffffff' at each call site), while safeTheme is the
+  // APP theme -- dark. Taking label colour straight from it painted the deck
+  // title, the slide captions, the assistant's suggestion chips and the
+  // composer placeholder at ~#e0e0e0 on white: visible as shapes, reading as
+  // disabled. Contrast against the panel's own background instead.
+  //
+  // Same fix, same reasoning as TOOLBAR_CHROME in PresentationSharedToolbar --
+  // that one landed on the toolbar only, which is why the bar looked right
+  // while everything either side of it looked switched off.
+  const panelTheme = {
+    ...safeTheme,
+    text: '#374151',          // ~10.4:1 on white
+    textSecondary: '#6B7280', // ~4.8:1 -- clears the 4.5:1 WCAG AA floor
+    border: '#E5E7EB',
+    surface: '#F9FAFB',
+    isDark: false,
+  };
 
 
 
@@ -5053,7 +5071,7 @@ const PresentationComposer = ({
 
           {/* Sidebar - Slide list */}
           {!mobileViewOnly && (
-            <View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: '#ffffff', borderRightColor: safeTheme.border }]}>
+            <View style={[styles.sidebar, { width: sidebarWidth, backgroundColor: '#ffffff', borderRightColor: panelTheme.border }]}>
 
               {/* Title Area Above Slide Nav */}
               <View style={{ marginBottom: 16, paddingHorizontal: 4 }}>
@@ -5086,16 +5104,16 @@ const PresentationComposer = ({
                     style={{ marginBottom: 8 }}
                   />
                 )}
-                <Text style={[styles.sidebarTitle, { color: safeTheme.text, fontSize: 16 }]} numberOfLines={1}>
+                <Text style={[styles.sidebarTitle, { color: panelTheme.text, fontSize: 16 }]} numberOfLines={1}>
                   {presentationTitle}
                 </Text>
                 {vaultDisplayName && (
-                  <Text style={{ fontSize: 11, color: safeTheme.text, opacity: 0.6, fontStyle: 'italic', marginBottom: 2 }}>
+                  <Text style={{ fontSize: 11, color: panelTheme.text, opacity: 0.6, fontStyle: 'italic', marginBottom: 2 }}>
                     Data Store: {vaultDisplayName}
                   </Text>
                 )}
                 {lastSaved && (
-                  <Text style={{ fontSize: 10, color: safeTheme.textSecondary }}>
+                  <Text style={{ fontSize: 10, color: panelTheme.textSecondary }}>
                     {isSaving ? 'Saving...' : `Saved ${new Date(lastSaved).toLocaleTimeString()}`}
                   </Text>
                 )}
@@ -5106,7 +5124,7 @@ const PresentationComposer = ({
                       contentType="presentation"
                       sourceId={currentPresentationId}
                       title={presentationTitle}
-                      theme={safeTheme}
+                      theme={panelTheme}
                       size="small"
                       showLabel={true}
                       apiConfig={apiConfig}
@@ -5199,9 +5217,9 @@ const PresentationComposer = ({
                     onPress={goToPrevSlide}
                     style={{ opacity: currentSlideIndex <= 0 ? 0.3 : 1, padding: 4 }}
                   >
-                    <Ionicons name="chevron-back" size={18} color={safeTheme.text} />
+                    <Ionicons name="chevron-back" size={18} color={panelTheme.text} />
                   </TouchableOpacity>
-                  <Text style={[styles.sidebarTitle, { color: safeTheme.text, fontSize: 13, marginBottom: 0 }]}>
+                  <Text style={[styles.sidebarTitle, { color: panelTheme.text, fontSize: 13, marginBottom: 0 }]}>
                     Slide {currentSlideIndex + 1}/{slides.length}
                   </Text>
                   <TouchableOpacity
@@ -5209,19 +5227,19 @@ const PresentationComposer = ({
                     onPress={goToNextSlide}
                     style={{ opacity: currentSlideIndex >= slides.length - 1 ? 0.3 : 1, padding: 4 }}
                   >
-                    <Ionicons name="chevron-forward" size={18} color={safeTheme.text} />
+                    <Ionicons name="chevron-forward" size={18} color={panelTheme.text} />
                   </TouchableOpacity>
                 </View>
 
                 {/* 2. View Toggle Button */}
-                <Tooltip text={slidePanelViewMode === 'thumbnail' ? 'Switch to List View' : 'Switch to Thumbnail View'} theme={safeTheme}>
+                <Tooltip text={slidePanelViewMode === 'thumbnail' ? 'Switch to List View' : 'Switch to Thumbnail View'} theme={panelTheme}>
                   <TouchableOpacity
                     style={{
                       padding: 6,
-                      backgroundColor: safeTheme.background,
+                      backgroundColor: panelTheme.background,
                       borderRadius: 6,
                       borderWidth: 1,
-                      borderColor: safeTheme.border || '#e0e0e0',
+                      borderColor: panelTheme.border || '#e0e0e0',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -5230,7 +5248,7 @@ const PresentationComposer = ({
                     <Ionicons
                       name={slidePanelViewMode === 'thumbnail' ? 'list-outline' : 'grid-outline'}
                       size={16}
-                      color={safeTheme.text}
+                      color={panelTheme.text}
                     />
                   </TouchableOpacity>
                 </Tooltip>
@@ -5238,7 +5256,7 @@ const PresentationComposer = ({
                 {/* 3. Add Slide Button */}
                 <TouchableOpacity
                   style={[styles.addSlideBtn, {
-                    backgroundColor: safeTheme.primary,
+                    backgroundColor: panelTheme.primary,
                     height: 32,
                     width: '100%',
                     alignItems: 'center',
@@ -5262,7 +5280,7 @@ const PresentationComposer = ({
               style={styles.resizer}
               {...panResponder.panHandlers}
             >
-              <View style={{ width: 1, height: '100%', backgroundColor: safeTheme.border, marginLeft: 2 }} />
+              <View style={{ width: 1, height: '100%', backgroundColor: panelTheme.border, marginLeft: 2 }} />
             </View>
           )}
 
@@ -5278,7 +5296,7 @@ const PresentationComposer = ({
           >
             {/* Shared Toolbar */}
             <PresentationSharedToolbar
-              theme={safeTheme}
+              theme={panelTheme}
               activeCanvasRef={activeCanvasRef}
               selectionInfo={selectionInfo}
               onOpenStylePicker={() => setShowStylePicker(true)}
@@ -5348,9 +5366,9 @@ const PresentationComposer = ({
                         marginBottom: 24,
                         alignItems: 'center',
                         borderLeftWidth: 4,
-                        borderLeftColor: isActiveSlide ? safeTheme.primary : 'transparent',
+                        borderLeftColor: isActiveSlide ? panelTheme.primary : 'transparent',
                         borderRadius: 8,
-                        backgroundColor: isActiveSlide ? (safeTheme.primary + '08') : 'transparent',
+                        backgroundColor: isActiveSlide ? (panelTheme.primary + '08') : 'transparent',
                         paddingLeft: 8,
                         paddingRight: 4,
                         paddingVertical: 8,
@@ -5358,7 +5376,7 @@ const PresentationComposer = ({
                     >
                       <Text style={{
                         fontSize: 11,
-                        color: isActiveSlide ? safeTheme.primary : (safeTheme.textSecondary || '#888'),
+                        color: isActiveSlide ? panelTheme.primary : (panelTheme.textSecondary || '#888'),
                         marginBottom: 6,
                         fontWeight: isActiveSlide ? '600' : '400',
                       }}>
@@ -5379,7 +5397,7 @@ const PresentationComposer = ({
                         presentationStyle={presentationStyle}
                         iconSet={presentationStyle?.iconSet}
                         awareness={collaboration?.awareness}
-                        theme={safeTheme}
+                        theme={panelTheme}
                         isEditable={true}
                         hideToolbar={true}
                         selectedElementId={isActiveSlide ? selectedElementId : null}
@@ -5528,7 +5546,7 @@ const PresentationComposer = ({
               style={styles.resizer}
               {...rightPanResponder.panHandlers}
             >
-              <View style={{ width: 1, height: '100%', backgroundColor: safeTheme.border, marginLeft: 2 }} />
+              <View style={{ width: 1, height: '100%', backgroundColor: panelTheme.border, marginLeft: 2 }} />
             </View>
           )}
 
@@ -5600,7 +5618,7 @@ const PresentationComposer = ({
                       chatting, the chat history takes the full panel height. */}
                   {aiChatMessages.length === 0 && (
                   <ScrollView style={{ flex: 1, marginBottom: 10, marginTop: 16 }}>
-                    <Text style={{ fontSize: 13, color: safeTheme.textSecondary, lineHeight: 22, fontWeight: '400', paddingHorizontal: 4 }}>
+                    <Text style={{ fontSize: 13, color: panelTheme.textSecondary, lineHeight: 22, fontWeight: '400', paddingHorizontal: 4 }}>
                       I can see your whole deck — edit, add, delete or reorder slides, restyle, review. Try:
                     </Text>
                     <View style={{ marginTop: 16, gap: 10, paddingHorizontal: 4 }}>
@@ -5625,7 +5643,7 @@ const PresentationComposer = ({
                             shadowRadius: 2,
                           }}
                         >
-                          <Text style={{ fontSize: 12, color: safeTheme.text }}>{example}</Text>
+                          <Text style={{ fontSize: 12, color: panelTheme.text }}>{example}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -5845,14 +5863,14 @@ const PresentationComposer = ({
                     <View style={{ gap: 8, marginBottom: 10 }}>
                       {/* Top Row: Attachment + Scope Selector */}
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Tooltip text="Attach File" theme={safeTheme}>
+                        <Tooltip text="Attach File" theme={panelTheme}>
                           <TouchableOpacity
                             style={{
                               padding: 10,
-                              backgroundColor: safeTheme.background,
+                              backgroundColor: panelTheme.background,
                               borderRadius: 8,
                               borderWidth: 1,
-                              borderColor: safeTheme.border,
+                              borderColor: panelTheme.border,
                               justifyContent: 'center',
                               alignItems: 'center',
                               height: 36,
@@ -5865,7 +5883,7 @@ const PresentationComposer = ({
                               }
                             }}
                           >
-                            <Ionicons name="attach" size={18} color={safeTheme.textSecondary || '#666'} />
+                            <Ionicons name="attach" size={18} color={panelTheme.textSecondary || '#666'} />
                           </TouchableOpacity>
                         </Tooltip>
 
@@ -5898,7 +5916,7 @@ const PresentationComposer = ({
                         <TextInput
                           style={[styles.aiChatInput, {
                             backgroundColor: isAiLocked ? '#F3F4F6' : '#F8FAFC',
-                            color: isAiLocked ? '#9CA3AF' : safeTheme.text,
+                            color: isAiLocked ? '#9CA3AF' : panelTheme.text,
                             borderColor: '#E2E8F0',
                             flex: 1,
                             marginBottom: 0, // Remove bottom margin as container handles it
@@ -5973,7 +5991,7 @@ const PresentationComposer = ({
                   onSelectElement={handleSelectElement}
                   onUpdateElement={handleElementUpdate}
                   onDeleteElement={handleDeleteElement}
-                  theme={safeTheme}
+                  theme={panelTheme}
                 />
               )}
             </View>

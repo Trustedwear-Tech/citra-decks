@@ -129,9 +129,26 @@ const AppContent = () => {
     setFolderCreateError(null);
     try {
       const label = TYPE_CONFIG[selectedType]?.folderApiName || selectedType;
-      const folder = await createArtifactFolder(
-        `Untitled ${label} — ${new Date().toLocaleDateString()}`
-      );
+      // The backend rejects a duplicate folder name in the same workspace with
+      // a 409. A date-only name meant the FIRST deck of the day succeeded and
+      // every later one failed with "Failed to create folder" and no way
+      // forward until the next day.
+      //
+      // The time makes ordinary repeat use collide-free; the retry covers the
+      // remaining case of two created inside the same minute, which would
+      // otherwise hit the identical wall just rarely enough to look random.
+      const now = new Date();
+      const base = `Untitled ${label} — ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+      let folder = null;
+      for (let attempt = 0; attempt < 5 && !folder; attempt += 1) {
+        const name = attempt === 0 ? base : `${base} (${attempt + 1})`;
+        try {
+          folder = await createArtifactFolder(name);
+        } catch (err) {
+          const conflict = /409|already exists/i.test(err?.message || '');
+          if (!conflict || attempt === 4) throw err;
+        }
+      }
       setActiveFolder(folder);
       setActiveArtifact(null);
       setRoute(ROUTE.COMPOSER);
