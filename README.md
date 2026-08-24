@@ -67,6 +67,39 @@ a vision model, and patched** from that critique. It is why the output does not
 look like a wall of bullets. `ARCHITECTURE.md` has the full pipeline and the
 module map for all three composers.
 
+### Where your documents go in
+
+A generic slide tool writes from what the model already knows. This writes from
+what your files say — so the first question it asks is what to read.
+
+**Before the deck exists**, on the goal step: attach the material and it is
+chunked, embedded and stored before a single slide is written. The outline is
+built from it.
+
+<p align="center">
+  <img alt="The goal step's Upload Project Files to Data Store control, with the per-deck data store named above it"
+       src="assets/screens/30-upload-goal.png" width="100%">
+</p>
+
+<p align="center"><i>Each deck gets its own data store — the folder named at the top of this step. Files land there, not in a global pile, so two decks never read each other's material by accident.</i></p>
+
+
+**Once the deck is open**, from the paperclip beside the AI chat: add one more
+document mid-conversation and ask for a change that uses it.
+
+<p align="center">
+  <img alt="The Upload Files dialog opened from the AI panel, offering Documents, Images, Import from URL and Ingest from Internet"
+       src="assets/screens/31-upload-chat.png" width="100%">
+</p>
+
+<p align="center"><i>PDF, Excel, CSV, Word, TXT, HTML and JSON, plus images — or pull the source straight off a URL. Spreadsheets are not just read: the numbers on your slides are computed from them in a sandbox, not generated.</i></p>
+
+Both routes land in the same place: your own Milvus, in a store scoped to that
+deck, where the documents **stay until you delete them**. Come back in a month,
+open the deck, ask for a change — it still has the source material. Nothing is
+sent anywhere else, and nothing is retained by a third party, because the
+vector database and the model endpoint are both yours.
+
 ### What that looks like
 
 One unbroken run on a local install — the goal below produced the outline
