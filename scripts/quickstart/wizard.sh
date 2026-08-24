@@ -95,17 +95,22 @@ if [ -z "$key" ]; then
 fi
 
 base="https://openrouter.ai/api/v1"
-model="deepseek/deepseek-v4-pro"
+# Large carries the reasoning work (main chat, code execution, SQL, workflow
+# code-gen); small and medium only do cheap classification-style calls
+# (transcript cleanup, intent parsing, titles, diagrams), so they run the
+# cheaper flash model. Matches .env.example.
+large_model="deepseek/deepseek-v4-pro:nitro"
+fast_model="deepseek/deepseek-v4-flash:nitro"
 # A key is only valid against the endpoint it was issued for, so base URL and
 # key are rewritten together whenever a key is entered. The MODEL on each tier
 # is a starting point, not a credential — setkv_default leaves yours alone.
-setkv LLM_LARGE_BASE_URL  "$base"; setkv_default LLM_LARGE_MODEL  "$model"; setkv LLM_LARGE_API_KEY  "$key"
-setkv LLM_MEDIUM_BASE_URL "$base"; setkv_default LLM_MEDIUM_MODEL "$model"; setkv LLM_MEDIUM_API_KEY "$key"
-setkv LLM_SMALL_BASE_URL  "$base"; setkv_default LLM_SMALL_MODEL  "$model"; setkv LLM_SMALL_API_KEY  "$key"
+setkv LLM_LARGE_BASE_URL  "$base"; setkv_default LLM_LARGE_MODEL  "$large_model"; setkv LLM_LARGE_API_KEY  "$key"
+setkv LLM_MEDIUM_BASE_URL "$base"; setkv_default LLM_MEDIUM_MODEL "$fast_model";  setkv LLM_MEDIUM_API_KEY "$key"
+setkv LLM_SMALL_BASE_URL  "$base"; setkv_default LLM_SMALL_MODEL  "$fast_model";  setkv LLM_SMALL_API_KEY  "$key"
 # Slide and report layout starts pinned to GLM-5.1 — it produces the best
 # structure of the models tested, and OpenRouter carries it.
-setkv_default PRESENTATION_LLM_MODEL "z-ai/glm-5.1"
-setkv_default PRINTABLE_LLM_MODEL    "z-ai/glm-5.1"
+setkv_default PRESENTATION_LLM_MODEL "z-ai/glm-5.1:nitro"
+setkv_default PRINTABLE_LLM_MODEL    "z-ai/glm-5.1:nitro"
 # Grounding. Without these the composers still draft, but from nothing but the
 # prompt — the one thing this product exists not to do.
 # Model and dimension must agree or the Milvus collection is built at the wrong

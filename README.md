@@ -266,7 +266,8 @@ Every default is open-weights:
 
 | Role | Default | Notes |
 |---|---|---|
-| Drafting | `deepseek/deepseek-v4-pro` | `LLM_LARGE/MEDIUM/SMALL_MODEL` |
+| Drafting | `deepseek/deepseek-v4-pro` | `LLM_LARGE_MODEL` — the reasoning tier |
+| Cheap calls (titles, intent, diagrams) | `deepseek/deepseek-v4-flash` | `LLM_SMALL_MODEL` / `LLM_MEDIUM_MODEL` |
 | Slide + report layout | `z-ai/glm-5.1` | `PRESENTATION_LLM_MODEL` / `PRINTABLE_LLM_MODEL` — measurably better structure than the general-purpose tier |
 | Embeddings | `baai/bge-m3` at 768 | the client sends `dimensions`, so it returns 768 rather than its native 1024, matching the Milvus collection |
 | **Image generation** | **required — Runware, `runware:400@1`** | cover art and section imagery. Its own key: the one thing the OpenRouter key does not cover |

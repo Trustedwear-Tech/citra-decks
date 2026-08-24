@@ -61,12 +61,12 @@ def test_tier_specific_env_takes_precedence(monkeypatch):
 
     monkeypatch.setenv("LLM_LARGE_BASE_URL", "https://large.example/v1")
     monkeypatch.setenv("LLM_LARGE_API_KEY", "large-key")
-    monkeypatch.setenv("LLM_LARGE_MODEL", "deepseek/deepseek-chat-v3.1")
+    monkeypatch.setenv("LLM_LARGE_MODEL", "deepseek/deepseek-v4-pro:nitro")
 
     cfg = get_tier_config("large")
     assert cfg["base_url"] == "https://large.example/v1"
     assert cfg["api_key"] == "large-key"
-    assert cfg["model"] == "deepseek/deepseek-chat-v3.1"
+    assert cfg["model"] == "deepseek/deepseek-v4-pro:nitro"
 
 
 def test_legacy_env_used_when_tier_unset(monkeypatch):
