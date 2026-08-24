@@ -114,14 +114,22 @@ def main() -> int:
         page.wait_for_timeout(7000)
         shot(page, "32-vault", "the deck's data store: what it has read, and delete")
 
-        body = " ".join(page.inner_text("body").split())
-        for word in ("Delete", "delete"):
-            if word in body:
-                print(f"  delete control present ({word!r} on screen)")
-                break
-        else:
-            print("  [!!] no delete control visible in the data store",
-                  file=sys.stderr)
+        # Look inside the MODAL, not the whole page. Scanning document.body for
+        # "delete" matched the AI panel's own copy ("edit, add, delete or
+        # reorder slides") and reported a delete control on a modal that was
+        # empty -- a false pass that read exactly like a real one.
+        found = page.evaluate("""() => {
+          const txt = [...document.querySelectorAll('*')]
+            .filter(e => e.children.length === 0)
+            .map(e => (e.textContent||'').trim());
+          const files  = txt.filter(t => /\.(md|pdf|docx?|xlsx?|csv|txt|pptx?)$/i.test(t));
+          const remove = txt.filter(t => /^(delete|remove)$/i.test(t));
+          return {files, remove: remove.length};
+        }""")
+        print(f"  files listed in the panel: {found['files'] or 'NONE'}")
+        print(f"  delete controls: {found['remove']}")
+        if not found["files"]:
+            print("  [!!] the data store lists no files", file=sys.stderr)
         br.close()
     return 0
 

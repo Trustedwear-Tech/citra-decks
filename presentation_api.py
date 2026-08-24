@@ -1458,6 +1458,12 @@ class SavePresentationRequest(BaseModel):
     presentation_type: str = Field(default="informative", description="Presentation type")
     thumbnail: Optional[str] = Field(default=None, description="Thumbnail image (base64 or URL)")
     folder_id: Optional[str] = Field(default=None, description="Presentation's dedicated folder (one per artifact)")
+    # Accepted because the composer has always sent the plural. Pydantic
+    # dropped it as unknown, folder_id fell back to None, and every saved deck
+    # stored null -- detaching it from its own data store, so the folder view
+    # opened empty and a reopened deck had no documents to read. Taking either
+    # here means an un-updated client keeps working.
+    folder_ids: Optional[List[str]] = Field(default=None, description="Legacy plural form of folder_id; first entry wins")
 # ... (previous models)
 
 class BatchGenerateSlidesRequest(BaseModel):
@@ -5030,7 +5036,8 @@ async def save_presentation(http_request: Request, body: SavePresentationRequest
             "owner_id": _personal_sa_id,
             "org_id": _owner_org_id or None,
             "thumbnail": thumbnail_url,
-            "folder_id": body.folder_id,
+            # Either spelling; the singular wins when both are sent.
+            "folder_id": body.folder_id or (body.folder_ids[0] if body.folder_ids else None),
             "updated_at": datetime.utcnow()
         }
         
@@ -5278,6 +5285,12 @@ async def list_presentations(request: Request, team_id: str = None, all_workspac
                 "thumbnail": 1,
                 "user_id": 1,
                 "team_id": 1,
+                # The shell opens a deck straight from this row and takes its
+                # data store from folder_id. Leaving it out of the projection
+                # meant every deck opened detached: the folder view came up
+                # empty and a reopened deck had no documents to read, even when
+                # the value was sitting in Mongo.
+                "folder_id": 1,
                 "slide_count": {"$size": {"$ifNull": ["$slides", []]}}
             }}
         ]
