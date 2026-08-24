@@ -6,7 +6,7 @@
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at http://www.apache.org/licenses/LICENSE-2.0
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, ActivityIndicator, Text, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -160,7 +160,19 @@ const AppContent = () => {
     }
   }, [selectedType, isCreatingFolder]);
 
+  // The list modals call onLoadPresentation(...) and then onClose() back to
+  // back. onClose is handleCloseList, which routes to LANDING -- so opening a
+  // saved artifact loaded it, set the composer route, and was immediately
+  // clobbered back to the landing page. The deck was fetched (200 on
+  // /presentation/load/...) and then thrown away in front of the user.
+  //
+  // The modals are not wrong: closing themselves made sense when they floated
+  // OVER a composer. In this shell the list is a route, so "closed" has to mean
+  // something different depending on why it closed. This ref carries that.
+  const justOpenedRef = useRef(false);
+
   const handleOpenExisting = useCallback((artifact) => {
+    justOpenedRef.current = true;
     setActiveArtifact(artifact);
     setActiveFolder(artifact?.folder_id ? { id: artifact.folder_id } : null);
     setRoute(ROUTE.COMPOSER);
@@ -173,6 +185,12 @@ const AppContent = () => {
   }, []);
 
   const handleCloseList = useCallback(() => {
+    // Ignore the close that immediately follows opening an artifact; that one
+    // is the modal tidying up after itself, not the user asking to leave.
+    if (justOpenedRef.current) {
+      justOpenedRef.current = false;
+      return;
+    }
     setSelectedType(null);
     setRoute(ROUTE.LANDING);
   }, []);

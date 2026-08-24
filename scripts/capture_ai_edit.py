@@ -63,21 +63,39 @@ def main() -> int:
         shot(page, "16-list", "the saved deck, listed after a full reload")
 
         # ── LOAD: open the saved deck ───────────────────────────────────────
+        # Click the CARD, not its title. The title is a text node inside the
+        # tile; the handler is on the tile. Clicking the words did nothing and
+        # the run then reported "AI chat box not found", which described the
+        # consequence rather than the cause.
+        # The card is a real TouchableOpacity (PresentationListModal.js:335,
+        # onPress -> handleLoadPresentation), so DISPATCH to the pressable
+        # rather than clicking coordinates. Two earlier attempts aimed the
+        # mouse at the title and then at the "N slides" badge; both landed on
+        # the modal backdrop, closed the list, and left the run on the landing
+        # page -- which then reported "AI chat box not found".
         opened = page.evaluate("""() => {
-          // the saved deck's card is any tile that is not the "create" one
-          const cards = [...document.querySelectorAll('*')]
-            .filter(e => e.children.length === 0
-                      && /Untitled presentation|Predictive/i.test(e.textContent||''));
-          if (!cards.length) return null;
-          const r = cards[0].getBoundingClientRect();
-          return {x: r.x + r.width/2, y: r.y + r.height/2, t: cards[0].textContent.trim()};
+          const want = /mid-sized manufacturer|Predictive|Untitled presentation/i;
+          for (const e of document.querySelectorAll('*')) {
+            if (e.children.length !== 0) continue;
+            if (!want.test(e.textContent || '')) continue;
+            let p = e;
+            for (let i = 0; i < 8 && p; i++) {
+              if (/r-1loqt21/.test((p.className||'').toString())) {
+                const r = p.getBoundingClientRect();
+                const o = {bubbles:true, cancelable:true,
+                           clientX:r.x+r.width/2, clientY:r.y+r.height/2,
+                           button:0, pointerId:1, isPrimary:true};
+                for (const t of ['pointerdown','mousedown','pointerup','mouseup','click'])
+                  p.dispatchEvent(t.startsWith('pointer')
+                    ? new PointerEvent(t,o) : new MouseEvent(t,o));
+                return {t: (e.textContent||'').trim(),
+                        w: Math.round(r.width), h: Math.round(r.height)};
+              }
+              p = p.parentElement;
+            }
+          }
+          return null;
         }""")
-        if not opened:
-            print("  [!!] no saved deck in the list -- nothing to load",
-                  file=sys.stderr)
-            br.close(); return 1
-        print(f"  opening: {opened['t'][:60]}")
-        page.mouse.click(opened["x"], opened["y"])
         try:
             page.wait_for_function(
                 "() => /Slide \\d+ of \\d+/.test(document.body.innerText)", timeout=60000)
