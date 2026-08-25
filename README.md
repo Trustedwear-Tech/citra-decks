@@ -288,6 +288,14 @@ cd citra-decks
 make wizard
 ```
 
+Or download a release — self-contained, no git needed:
+
+```bash
+curl -sSL https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.0.tar.gz | tar xz
+cd citra-decks-0.1.0
+make wizard
+```
+
 It asks for two keys — one OpenRouter key, wired to drafting, embeddings and
 vision, and one Runware key for generated imagery — then brings the stack up.
 Both are required; every model choice it writes is a quick-start default you
