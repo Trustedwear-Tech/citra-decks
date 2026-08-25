@@ -61,6 +61,22 @@ jobs:
           exit "$bad"
 
   # ---------------------------------------------------------------------------
+  compose-build:
+    name: Compose Build (what make wizard runs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the whole stack from source
+        run: |
+          # docker-build below builds each image on its own. This builds them
+          # the way `make wizard` does -- together, through compose. This repo
+          # has no BuildKit cache mounts today, so it is not exposed to the
+          # sharing race that bit citra-decision-system, but building the real
+          # command is what would notice if one were ever added.
+          cp .env.example .env
+          docker compose -f docker-compose.yml build
+
+  # ---------------------------------------------------------------------------
   # Same matrix the release gate uses. Contexts come from docker-compose.yml,
   # which is what the wizard actually runs.
   # ---------------------------------------------------------------------------
