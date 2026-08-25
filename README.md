@@ -253,10 +253,32 @@ before it writes anything.
 
 | Need | Why |
 |------|-----|
-| **Docker Engine 24+** with Compose v2 | runs the whole stack |
+| **Docker Engine 24+** with **Compose v2** | runs the whole stack. Compose v1 is not enough |
 | **16 GB+ RAM** | Milvus is the heaviest container |
+| **curl** | the installer polls service health with it |
 | **An OpenRouter key** | drafting, grounding and vision |
 | **A Runware key** | generated imagery — required, a few cents per image |
+| **Internet on first run** | base images, plus the `pip`/`npm` installs in the build |
+
+**What you do _not_ need on the host**, despite the stack using them: Python and
+Node.js both run only inside the containers, `git` is needed to clone but not to
+build, and `make` is a convenience — every target has a
+`bash scripts/quickstart/...` equivalent.
+
+Install prerequisites on Ubuntu or Debian with:
+
+```bash
+sudo apt update && sudo apt install -y curl make
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"     # then log out and back in
+```
+
+On macOS install [Docker Desktop](https://docs.docker.com/desktop/install/mac-install/)
+and `brew install curl make`. On Windows install Docker Desktop and run
+everything from **Git Bash** or **WSL**.
+
+`make wizard` and `make setup` check all of this first and name whatever is
+missing before writing anything, so you do not have to verify it by hand.
 
 ### Easiest: the wizard
 
