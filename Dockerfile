@@ -46,7 +46,7 @@ COPY citra-queue /app/citra-queue
 COPY citra-llm /app/citra-llm
 
 # Install deps
-RUN pip install -r requirements.txt
+RUN pip install --retries 10 --timeout 60 -r requirements.txt
 
 # Copy service source LAST for caching
 COPY . /app

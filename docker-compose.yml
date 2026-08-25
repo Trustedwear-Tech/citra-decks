@@ -88,6 +88,20 @@ services:
       - -c
       - |
         set -eo pipefail
+        # WAIT FOR THE PORT, not just for the healthcheck. depends_on
+        # service_healthy only proves `db.adminCommand('ping')` answered; on a
+        # loaded machine mongod can pass that and still refuse an authenticated
+        # connection a moment later. This ran ONCE, and restart is "no", so a
+        # single ECONNREFUSED would leave rs0 uninitiated forever -- and the
+        # install would then fail much later pointing at the wrong service.
+        # Bit citra-decision-system for real; latent here until it is not.
+        for i in $$(seq 1 30); do
+          if mongosh --host mongodb --port 27017                -u "$$MONGODB_USER" -p "$$MONGODB_PASSWORD"                --authenticationDatabase admin --quiet                --eval 'db.adminCommand({ping:1}).ok' >/dev/null 2>&1; then
+            break
+          fi
+          echo "waiting for mongod to accept authenticated connections ($$i/30)"
+          sleep 2
+        done
         mongosh --host mongodb --port 27017 \
           -u "$$MONGODB_USER" -p "$$MONGODB_PASSWORD" \
           --authenticationDatabase admin --quiet --eval '
