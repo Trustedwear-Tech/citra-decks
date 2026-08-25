@@ -21,6 +21,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$REPO_ROOT"
 ENV_FILE="$REPO_ROOT/.env"
 
+# Before the FIRST question. The wizard asks for an OpenRouter key and a
+# Runware key before it reaches setup.sh, so a host that cannot run the stack
+# used to discover that only after the whole interview was over.
+. "$REPO_ROOT/scripts/quickstart/preflight.sh"
+preflight || exit 1
+
 b()  { printf '\033[1m%s\033[0m' "$1"; }
 hr() { printf '\n------------------------------------------------------------\n'; }
 ask() {

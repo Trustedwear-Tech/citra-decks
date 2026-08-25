@@ -21,6 +21,11 @@ cd "$REPO_ROOT"
 ENV_FILE="$REPO_ROOT/.env"
 COMPOSE="docker compose -f docker-compose.yml"
 
+# Check the host BEFORE writing .env, rather than failing on the first
+# docker call with secrets already generated.
+. "$REPO_ROOT/scripts/quickstart/preflight.sh"
+preflight || exit 1
+
 rand() { openssl rand -hex "$1" 2>/dev/null || head -c "$((${1}*2))" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 setkv() { # key value file
   local k="$1" v="$2" f="$3"
