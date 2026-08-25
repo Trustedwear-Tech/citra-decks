@@ -1,0 +1,170 @@
+# Copyright (c) 2026 Trustedwear Tech Private Limited (https://citra-ai.com)
+# Author: Rohit Kumar Chandan
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at http://www.apache.org/licenses/LICENSE-2.0
+
+# =============================================================================
+# Release: verify every image builds, then cut the GitHub Release.
+# =============================================================================
+# Nothing is pushed to a registry. Citra Decks is built from source by whoever
+# runs it -- `make wizard` compiles all three images locally -- so a published
+# image would be a second install path to keep working, and one that can drift
+# from the source without anyone noticing.
+#
+# The build is a GATE rather than a publish step: if the tag cannot be built
+# from a clean checkout there is nothing to release, because building it is
+# exactly what every user is about to do.
+# =============================================================================
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (semver, e.g. 0.1.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Verify the builds but create no release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate semver
+        run: |
+          if ! echo "${{ inputs.version }}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "::error::'${{ inputs.version }}' is not semver (e.g. 0.1.0)"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag must not already point elsewhere
+        run: |
+          TAG="v${{ inputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            AT=$(git rev-list -n1 "$TAG")
+            if [ "$AT" != "${{ github.sha }}" ]; then
+              echo "::error::$TAG exists and points at $AT, not ${{ github.sha }}"
+              exit 1
+            fi
+            echo "$TAG already exists at this commit - reusing it"
+          fi
+
+  # Contexts come from docker-compose.yml, which is what the wizard runs.
+  verify-builds:
+    name: builds ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            dockerfile: Dockerfile
+            context: .
+          - image: web
+            dockerfile: Dockerfile.web
+            context: .
+          - image: collaboration-server
+            dockerfile: collaboration-server/Dockerfile
+            context: collaboration-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          # Never pushed. This proves the tag builds from a clean checkout.
+          push: false
+          tags: citra-decks-${{ matrix.image }}:${{ inputs.version }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [validate, verify-builds]
+    if: ${{ !inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create the tag if it does not exist
+        run: |
+          TAG="v${{ inputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists - leaving it alone"
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+      - name: Changelog since the previous tag
+        id: changelog
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "v${{ inputs.version }}^" 2>/dev/null || echo "")
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            if [ -n "$PREV" ]; then
+              git log "${PREV}..v${{ inputs.version }}" --pretty='- %s'
+            else
+              git log --pretty='- %s' -50
+            fi
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Citra Decks v${{ inputs.version }}
+          body: |
+            ## Install
+
+            The source archives below are **self-contained**. There is no
+            registry to sign in to and no image published — you build the whole
+            thing on your own machine.
+
+            ```bash
+            curl -sSL https://github.com/${{ github.repository }}/archive/refs/tags/v${{ inputs.version }}.tar.gz | tar xz
+            cd citra-decks-${{ inputs.version }}
+            make wizard
+            ```
+
+            `make wizard` checks your host first and stops before writing
+            anything if something is missing, then asks for two keys — one
+            OpenRouter key for drafting, embeddings and vision, and one Runware
+            key for generated imagery — writes `.env`, builds all three images
+            from source and brings the stack up. A `git clone` works exactly
+            the same way.
+
+            Both keys are required. Every model choice the wizard writes is a
+            quick-start default you can change in `.env` afterwards.
+
+            ## Images
+
+            Built locally by the wizard — none are published:
+
+            | image | what it is |
+            |---|---|
+            | `backend` | the API: decks, reports, grounding, generation |
+            | `web` | the composer and viewer shell |
+            | `collaboration-server` | live multi-user editing |
+
+            ## Changelog
+
+            ${{ steps.changelog.outputs.changelog }}
