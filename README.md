@@ -274,8 +274,12 @@ sudo usermod -aG docker "$USER"     # then log out and back in
 ```
 
 On macOS install [Docker Desktop](https://docs.docker.com/desktop/install/mac-install/)
-and `brew install curl make`. On Windows install Docker Desktop and run
-everything from **Git Bash** or **WSL**.
+and `brew install curl make`. On Windows install Docker Desktop and run the
+setup from **Git Bash** (it ships with
+[Git for Windows](https://git-scm.com/download/win)) or **WSL** — `make` and
+the `scripts/quickstart/*.sh` scripts need a POSIX shell, not PowerShell or
+cmd. The plain `docker compose ...` commands themselves run in any shell,
+PowerShell included.
 
 `make wizard` and `make setup` check all of this first and name whatever is
 missing before writing anything, so you do not have to verify it by hand.
@@ -288,12 +292,24 @@ cd citra-decks
 make wizard
 ```
 
-Or download a release — self-contained, no git needed:
+Or download a release — self-contained, no git needed (substitute the newest
+tag from the Releases page):
 
 ```bash
-curl -sSL https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.0.tar.gz | tar xz
-cd citra-decks-0.1.0
+# Linux / macOS
+curl -sSL https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.3.tar.gz | tar xz
+cd citra-decks-0.1.3
 make wizard
+```
+
+```powershell
+# Windows PowerShell — must be curl.exe (bare `curl` is PowerShell's alias for
+# Invoke-WebRequest), and downloading before extracting avoids the binary-pipe
+# corruption in Windows PowerShell. curl.exe and tar ship with Windows 10+.
+curl.exe -sSLo citra-decks.tar.gz https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.3.tar.gz
+tar xzf citra-decks.tar.gz
+cd citra-decks-0.1.3
+# then, from Git Bash:  bash scripts/quickstart/wizard.sh
 ```
 
 It asks for two keys — one OpenRouter key, wired to drafting, embeddings and
@@ -302,7 +318,8 @@ Both are required; every model choice it writes is a quick-start default you
 can change in `.env` afterwards.
 
 > **No `make`?** It is not installed by default on Windows, and the targets are
-> thin wrappers — run the scripts directly instead:
+> thin wrappers — run the scripts directly instead, from **Git Bash** (ships
+> with [Git for Windows](https://git-scm.com/download/win)) or WSL:
 > `bash scripts/quickstart/wizard.sh`
 
 ### Or by hand — two phases
