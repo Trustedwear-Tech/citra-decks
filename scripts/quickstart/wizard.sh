@@ -64,7 +64,7 @@ done
 . "$REPO_ROOT/scripts/quickstart/preflight.sh"
 preflight || exit 1
 
-b()  { printf '\033[1m%s\033[0m' "$1"; }
+b()  { printf '%s%s%s' "$C_B" "$1" "$C_0"; }
 hr() { printf '\n------------------------------------------------------------\n'; }
 ask() {
   local q="$1" def="${2:-}" ans
@@ -76,6 +76,18 @@ yes_no() { local q="$1" def="${2:-y}" a; a="$(ask "$q (y/n)" "$def")"; case "$a"
 # One '*' per character. Shown after every hidden entry so the user can tell a
 # paste landed — and, via the length, that it landed exactly once.
 mask() { printf '%*s' "${#1}" '' | tr ' ' '*'; }
+
+# Colours: green = success, red = failure, yellow = caution. Only on a
+# terminal — piped/CI output and NO_COLOR stay plain text.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_G=$'\033[32m'; C_R=$'\033[31m'; C_Y=$'\033[33m'; C_B=$'\033[1m'; C_0=$'\033[0m'
+else
+  C_G=""; C_R=""; C_Y=""; C_B=""; C_0=""
+fi
+# What this run actually did — printed in the final summary.
+RUN_SUMMARY=""
+did() { RUN_SUMMARY="${RUN_SUMMARY}    - $1\n"; }
+
 
 # --- Checkpoints -------------------------------------------------------------
 # Every completed step is appended to .wizard-state.log (gitignored), and a
@@ -90,7 +102,7 @@ trap 'rc=$?; if [ "$rc" -ne 0 ]; then
         word="FAILED"; case "$rc" in 130|143) word="INTERRUPTED";; esac
         printf "%s  %s during: %s (exit %s)\n" "$(date '\''+%Y-%m-%d %H:%M:%S'\'')" "$word" "$CURRENT_STEP" "$rc" >> "$STATE_FILE"
         echo "" >&2
-        echo "  [!!] $word during: $CURRENT_STEP. Completed steps are kept —" >&2
+        echo "  ${C_R}[!!] $word during: $CURRENT_STEP.${C_0} Completed steps are kept —" >&2
         echo "       just re-run the wizard; it resumes from here." >&2
       fi' EXIT
 # Ctrl-C / kill: without these, bash skips the EXIT trap on a fatal signal
@@ -149,7 +161,8 @@ setkv() {
   fi
 }
 
-clear 2>/dev/null || true
+# Only on a real terminal: piped, `clear` writes escape codes into the log.
+[ -t 1 ] && { clear 2>/dev/null || true; }
 echo "$(b "citra-decks — setup wizard")"
 echo "Sovereign presentations, visual reports and long-form documents."
 
@@ -168,16 +181,17 @@ if [ "$FRESH" = 1 ]; then
   fi
   CURRENT_STEP="fresh cleanup (down -v)"
   docker compose down -v --remove-orphans
-  echo "  [ok] stack stopped, volumes removed"
+  echo "  ${C_G}[ok]${C_0} stack stopped, volumes removed"
   if [ -f "$ENV_FILE" ]; then
     bak="$ENV_FILE.bak.$(date +%Y%m%d-%H%M%S)"
     mv "$ENV_FILE" "$bak"
-    echo "  [ok] old .env moved to ${bak##*/} (restore it with: mv ${bak##*/} .env)"
+    echo "  ${C_G}[ok]${C_0} old .env moved to ${bak##*/} (restore it with: mv ${bak##*/} .env)"
   fi
   # The old log describes the install that was just deleted; archive it with
   # the .env so the new log starts at zero and cannot claim finished steps.
   [ -f "$STATE_FILE" ] && mv "$STATE_FILE" "$STATE_FILE.bak.$(date +%Y%m%d-%H%M%S)"
   ckpt "fresh cleanup — volumes deleted, previous .env and state log archived"
+  did "full cleanup: stack + volumes deleted, previous .env archived"
 fi
 
 progress_report
@@ -188,6 +202,7 @@ CURRENT_STEP="environment file"
 if [ -f "$ENV_FILE" ]; then
   echo "Found an existing .env — keeping it. The keys you enter below are"
   echo "updated; models and settings you tuned by hand are left as they are."
+  did ".env kept — your existing values preserved"
 else
   echo "Generating .env from .env.example with fresh random secrets..."
   cp .env.example "$ENV_FILE"
@@ -196,8 +211,9 @@ else
   setkv MONGODB_CONN_STRING "mongodb://root:${MONGO_PW}@mongodb:27017/?authSource=admin&replicaSet=rs0"
   setkv JWT_SECRET "$(rand 48)"
   setkv CONNECTION_ENCRYPTION_KEY "$(rand 32)"
-  echo "  [ok] secrets generated (Mongo password, JWT secret, encryption key)"
+  echo "  ${C_G}[ok]${C_0} secrets generated (Mongo password, JWT secret, encryption key)"
   ckpt ".env created with fresh secrets"
+  did ".env created with freshly generated secrets"
 fi
 
 # -- 2. AI provider -------------------------------------------------------------
@@ -221,17 +237,17 @@ cur_or_key="$(getkv LLM_LARGE_API_KEY)"
 if [ -n "$cur_or_key" ]; then
   echo "  Stored key: $(mask "$cur_or_key")  (${#cur_or_key} characters)"
   key="$(ask_secret "Paste a NEW OpenRouter key (input hidden; Enter keeps the stored one)")"
-  [ -z "$key" ] && echo "  [ok] keeping the stored OpenRouter key"
+  [ -z "$key" ] && echo "  ${C_G}[ok]${C_0} keeping the stored OpenRouter key"
 else
   key="$(ask_secret "Paste your OpenRouter API key (input hidden)")"
   if [ -z "$key" ]; then
     echo
-    echo "  [FAIL] no key entered. Presentation/printable generation cannot" >&2
+    echo "  ${C_R}[FAIL]${C_0} no key entered. Presentation/printable generation cannot" >&2
     echo "         produce anything without a model. Re-run once you have a key." >&2
     exit 1
   fi
 fi
-[ -n "$key" ] && echo "  [ok] key captured: $(mask "$key")  (${#key} characters)"
+[ -n "$key" ] && echo "  ${C_G}[ok]${C_0} key captured: $(mask "$key")  (${#key} characters)"
 
 base="https://openrouter.ai/api/v1"
 # Large carries the reasoning work (main chat, code execution, SQL, workflow
@@ -274,9 +290,9 @@ fi
 setkv_default EMBEDDING_MODEL     "baai/bge-m3"
 setkv_default EMBEDDING_DIMENSION "768"
 setkv_default VISION_MODEL    "qwen/qwen3-vl-32b-instruct"
-echo "  [ok] one key configured for drafting and grounding"
+echo "  ${C_G}[ok]${C_0} one key configured for drafting and grounding"
 echo "       (vision credentials set too, but the critique pass stays off)"
-[ -n "$key" ] && ckpt "OpenRouter key configured"
+if [ -n "$key" ]; then ckpt "OpenRouter key configured"; did "OpenRouter key stored"; else did "OpenRouter key kept (unchanged)"; fi
 
 # -- 3. Image generation ----------------------------------------------------------
 # Required, and deliberately Runware only. Without imagery a generated deck is
@@ -306,19 +322,19 @@ cur_rw="$(getkv IMAGE_GEN_API_KEY)"
 if [ -n "$cur_rw" ]; then
   echo "Stored key: $(mask "$cur_rw")  (${#cur_rw} characters)"
   rw="$(ask_secret "Runware API key (input hidden; Enter keeps the stored one)")"
-  [ -z "$rw" ] && echo "  [ok] keeping the stored Runware key"
+  [ -z "$rw" ] && echo "  ${C_G}[ok]${C_0} keeping the stored Runware key"
 else
   rw="$(ask_secret "Runware API key (input hidden)")"
   if [ -z "$rw" ]; then
     echo
-    echo "  [FAIL] no key entered. Decks would generate without any imagery," >&2
+    echo "  ${C_R}[FAIL]${C_0} no key entered. Decks would generate without any imagery," >&2
     echo "         which is not what this product is for. Re-run once you have" >&2
     echo "         a key — or, if you truly want imagery off, set the IMAGE_GEN_" >&2
     echo "         variables yourself in .env and skip this wizard." >&2
     exit 1
   fi
 fi
-[ -n "$rw" ] && echo "  [ok] key captured: $(mask "$rw")  (${#rw} characters)"
+[ -n "$rw" ] && echo "  ${C_G}[ok]${C_0} key captured: $(mask "$rw")  (${#rw} characters)"
 # Asked rather than hardcoded so a Runware user can pick their model, but
 # defaulted so pressing Enter always yields a working config. The default is
 # the AIR id this repo ships and relies on: image_gen_api.py names it
@@ -347,12 +363,12 @@ setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
 # deliberately discarded rather than preserved.
 if [ -n "$rw" ]; then
   if [ -n "$(getkv IMAGE_GEN_BASE_URL)" ]; then
-    echo "  [note] cleared IMAGE_GEN_BASE_URL — Runware does not read it"
+    echo "  ${C_Y}[note]${C_0} cleared IMAGE_GEN_BASE_URL — Runware does not read it"
   fi
   setkv IMAGE_GEN_BASE_URL ""
 fi
-echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
-[ -n "$rw" ] && ckpt "Runware key configured"
+echo "  ${C_G}[ok]${C_0} Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
+if [ -n "$rw" ]; then ckpt "Runware key configured"; did "Runware key stored"; else did "Runware key kept (unchanged)"; fi
 
 # Vision is a different thing from image generation, and it is OFF by default.
 # It re-renders each finished slide and sends the image to a vision model to
@@ -383,16 +399,17 @@ if [ -z "$(getkv ADMIN_EMAIL)" ] || [ -z "$(getkv ADMIN_PASSWORD)" ]; then
       read -rs acc_pw || { acc_pw=""; echo ""; break; }
       echo ""
       if [ "${#acc_pw}" -lt 8 ]; then
-        echo "  [!!] too short — 8 characters minimum (got ${#acc_pw})"
+        echo "  ${C_Y}[!!]${C_0} too short — 8 characters minimum (got ${#acc_pw})"
         acc_pw=""
       fi
     done
     if [ -n "$acc_pw" ]; then
       setkv ADMIN_EMAIL "$acc_email"
       setkv ADMIN_PASSWORD "$acc_pw"
-      echo "  [ok] password captured: $(mask "$acc_pw")  (${#acc_pw} characters)"
-      echo "  [ok] will seed ${acc_email} at backend startup"
+      echo "  ${C_G}[ok]${C_0} password captured: $(mask "$acc_pw")  (${#acc_pw} characters)"
+      echo "  ${C_G}[ok]${C_0} will seed ${acc_email} at backend startup"
       ckpt "account configured for seeding (${acc_email})"
+      did "your account (${acc_email}) will be seeded at backend startup"
     fi
   fi
 fi
@@ -403,18 +420,26 @@ if yes_no "Run setup now (data stores)?" "y"; then
   CURRENT_STEP="data stores (setup.sh)"
   "$REPO_ROOT/scripts/quickstart/setup.sh"
   ckpt "data stores up (setup.sh)"
+  did "data stores brought up (setup.sh)"
 fi
 if yes_no "Start all services?" "y"; then
   CURRENT_STEP="services (start.sh)"
   "$REPO_ROOT/scripts/quickstart/start.sh"
   ckpt "services up (start.sh)"
+  did "services brought up (start.sh)"
 fi
 CURRENT_STEP="done"
 
 hr
 wiz_admin_email="$(getkv ADMIN_EMAIL)"
 wiz_admin_pw="$(getkv ADMIN_PASSWORD)"
-echo "$(b "Done.")  Open  http://localhost:8094"
+wiz_web_port="$(getkv WEB_HOST_PORT)"; wiz_web_port="${wiz_web_port:-8094}"
+echo "$(b "Done.")"
+echo ""
+echo "What happened in this run:"
+printf '%b' "${RUN_SUMMARY:-    - nothing to change — everything was already in place\n}"
+echo ""
+echo "${C_G}Open the UI:${C_0}  http://localhost:${wiz_web_port}"
 echo ""
 if [ -n "$wiz_admin_email" ] && [ -n "$wiz_admin_pw" ]; then
   echo "Sign in:  ${wiz_admin_email}  /  $(mask "$wiz_admin_pw") (${#wiz_admin_pw} characters)"
@@ -431,5 +456,14 @@ echo ""
 echo "All accounts are equal: no admin role, no orgs — each account is its own"
 echo "private workspace. Registration is open to anyone who can reach the port,"
 echo "and password reset is not wired up for registered accounts."
-echo "Re-run this wizard any time to change keys:  ./scripts/quickstart/wizard.sh"
+echo ""
+echo "What next:"
+echo "  1. Open the UI and sign in (or register)."
+echo "  2. Presentations -> New: describe the deck you want in plain English"
+echo "     and generate it; Visual Reports and MS-Word Reports live in the"
+echo "     same shell."
+echo "  3. Upload documents/spreadsheets first if you want the numbers and"
+echo "     citations grounded in your own data — that is the point."
+echo "  4. Re-run this wizard any time to resume or change keys; --fresh"
+echo "     starts over, --help explains both."
 ckpt "done — wizard complete"
