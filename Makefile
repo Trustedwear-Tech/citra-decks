@@ -16,7 +16,7 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
 wizard: ## Guided setup: configure your AI key, then install (easiest first run)
-	./scripts/quickstart/wizard.sh
+	./scripts/quickstart/wizard.sh $(ARGS)
 
 setup: ## Phase 1: generate .env, start data stores, create the MinIO bucket
 	./scripts/quickstart/setup.sh

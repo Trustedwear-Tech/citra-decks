@@ -315,7 +315,14 @@ cd citra-decks-0.1.3
 It asks for two keys — one OpenRouter key, wired to drafting, embeddings and
 vision, and one Runware key for generated imagery — then brings the stack up.
 Both are required; every model choice it writes is a quick-start default you
-can change in `.env` afterwards.
+can change in `.env` afterwards. Keys and passwords are typed hidden and
+echoed back masked (`****` plus a length), so a paste is verifiable.
+
+Re-running the wizard RESUMES: `.env` and your data are kept, pressing Enter
+at a key prompt keeps the stored key, and only missing values are asked for.
+`make wizard ARGS=--fresh` (or `bash scripts/quickstart/wizard.sh --fresh`)
+is the opposite — full cleanup, volumes deleted, `.env` moved aside to a
+timestamped backup — and `--help` explains both modes.
 
 > **No `make`?** It is not installed by default on Windows, and the targets are
 > thin wrappers — run the scripts directly instead, from **Git Bash** (ships

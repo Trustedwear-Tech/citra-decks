@@ -14,12 +14,49 @@
 #      on the slides, and the OpenRouter key does not cover it)
 #   4. bring the stack up
 #
+#   wizard.sh            install, or resume/repair (keeps .env and your data)
+#   wizard.sh --fresh    full cleanup — volumes deleted — then set up from nothing
+#   wizard.sh --help     what each mode does
+#
 # Re-runnable: reads and updates the existing .env, so run it again to change
-# a key. Prereqs: docker, curl, openssl.
+# a key — Enter keeps any key that is already set. Prereqs: docker, curl,
+# openssl.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$REPO_ROOT"
 ENV_FILE="$REPO_ROOT/.env"
+
+usage() {
+  cat <<'EOF'
+citra-decks — guided setup wizard.
+
+Usage:  scripts/quickstart/wizard.sh [--fresh] [-h|--help]
+
+Without options — install, or RESUME:
+  Idempotent, safe to re-run any time (after a reboot, to change a key, or
+  after a failed first attempt). An existing .env is kept — models and
+  settings you tuned by hand are preserved, and pressing Enter at a key
+  prompt keeps the key already stored. Containers are started or updated
+  in place; your decks, reports, uploads and accounts survive.
+
+--fresh — full cleanup, then set up from nothing:
+  Stops the stack and DELETES its volumes — every deck, report, upload
+  and account in this install. .env is moved aside to .env.bak.<timestamp>
+  (never deleted), then the normal setup runs, asking everything again.
+  Asks for confirmation before touching anything.
+
+-h, --help — this text.
+EOF
+}
+
+FRESH=0
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help) usage; exit 0 ;;
+    --fresh)   FRESH=1 ;;
+    *) echo "unknown option: $arg" >&2; echo "" >&2; usage >&2; exit 2 ;;
+  esac
+done
 
 # Before the FIRST question. The wizard asks for an OpenRouter key and a
 # Runware key before it reaches setup.sh, so a host that cannot run the stack
@@ -36,6 +73,9 @@ ask() {
 }
 ask_secret() { local q="$1" ans; printf '%s: ' "$q" >&2; read -rs ans || true; printf '\n' >&2; printf '%s' "$ans"; }
 yes_no() { local q="$1" def="${2:-y}" a; a="$(ask "$q (y/n)" "$def")"; case "$a" in y|Y|yes|YES) return 0;; *) return 1;; esac; }
+# One '*' per character. Shown after every hidden entry so the user can tell a
+# paste landed — and, via the length, that it landed exactly once.
+mask() { printf '%*s' "${#1}" '' | tr ' ' '*'; }
 
 rand()  { openssl rand -hex "$1" 2>/dev/null || head -c "$((${1}*2))" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 getkv() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- ; }
@@ -61,6 +101,25 @@ setkv() {
 clear 2>/dev/null || true
 echo "$(b "citra-decks — setup wizard")"
 echo "Sovereign presentations, visual reports and long-form documents."
+
+# -- 0. --fresh: cleanup before anything else --------------------------------------
+if [ "$FRESH" = 1 ]; then
+  hr; echo "$(b "Fresh setup — full cleanup first")"
+  echo "This STOPS the stack and DELETES its volumes: every deck, report,"
+  echo "upload and account in this install is gone for good."
+  echo ".env is moved aside to .env.bak.<timestamp>, not deleted."
+  if ! yes_no "Continue?" "n"; then
+    echo "Aborted — nothing was touched."
+    exit 1
+  fi
+  docker compose down -v --remove-orphans
+  echo "  [ok] stack stopped, volumes removed"
+  if [ -f "$ENV_FILE" ]; then
+    bak="$ENV_FILE.bak.$(date +%Y%m%d-%H%M%S)"
+    mv "$ENV_FILE" "$bak"
+    echo "  [ok] old .env moved to ${bak##*/} (restore it with: mv ${bak##*/} .env)"
+  fi
+fi
 
 # -- 1. .env ------------------------------------------------------------------
 hr; echo "$(b "Step 1/4 — environment file")"
@@ -91,14 +150,24 @@ echo "draft in your documents, and a vision model to read images. One"
 echo "OpenRouter key covers all three."
 echo
 echo "  Get a key: $(b "https://openrouter.ai/keys")"
-key="$(ask_secret "Paste your OpenRouter API key (input hidden)")"
-
-if [ -z "$key" ]; then
-  echo
-  echo "  [FAIL] no key entered. Presentation/printable generation cannot" >&2
-  echo "         produce anything without a model. Re-run once you have a key." >&2
-  exit 1
+# Resume-friendly: "re-run any time to change a key" must not demand keys that
+# are already stored. Enter keeps the stored one; the FAIL applies only when
+# there is nothing to keep.
+cur_or_key="$(getkv LLM_LARGE_API_KEY)"
+if [ -n "$cur_or_key" ]; then
+  echo "  Stored key: $(mask "$cur_or_key")  (${#cur_or_key} characters)"
+  key="$(ask_secret "Paste a NEW OpenRouter key (input hidden; Enter keeps the stored one)")"
+  [ -z "$key" ] && echo "  [ok] keeping the stored OpenRouter key"
+else
+  key="$(ask_secret "Paste your OpenRouter API key (input hidden)")"
+  if [ -z "$key" ]; then
+    echo
+    echo "  [FAIL] no key entered. Presentation/printable generation cannot" >&2
+    echo "         produce anything without a model. Re-run once you have a key." >&2
+    exit 1
+  fi
 fi
+[ -n "$key" ] && echo "  [ok] key captured: $(mask "$key")  (${#key} characters)"
 
 base="https://openrouter.ai/api/v1"
 # Large carries the reasoning work (main chat, code execution, SQL, workflow
@@ -108,11 +177,18 @@ base="https://openrouter.ai/api/v1"
 large_model="deepseek/deepseek-v4-pro:nitro"
 fast_model="deepseek/deepseek-v4-flash:nitro"
 # A key is only valid against the endpoint it was issued for, so base URL and
-# key are rewritten together whenever a key is entered. The MODEL on each tier
-# is a starting point, not a credential — setkv_default leaves yours alone.
-setkv LLM_LARGE_BASE_URL  "$base"; setkv_default LLM_LARGE_MODEL  "$large_model"; setkv LLM_LARGE_API_KEY  "$key"
-setkv LLM_MEDIUM_BASE_URL "$base"; setkv_default LLM_MEDIUM_MODEL "$fast_model";  setkv LLM_MEDIUM_API_KEY "$key"
-setkv LLM_SMALL_BASE_URL  "$base"; setkv_default LLM_SMALL_MODEL  "$fast_model";  setkv LLM_SMALL_API_KEY  "$key"
+# key are rewritten together whenever a key is entered — and NOT when the
+# stored key is kept, which must not overwrite endpoints you pointed elsewhere
+# by hand. The MODEL on each tier is a starting point, not a credential —
+# setkv_default leaves yours alone (and, on the keep path, only fills gaps).
+if [ -n "$key" ]; then
+  setkv LLM_LARGE_BASE_URL  "$base"; setkv LLM_LARGE_API_KEY  "$key"
+  setkv LLM_MEDIUM_BASE_URL "$base"; setkv LLM_MEDIUM_API_KEY "$key"
+  setkv LLM_SMALL_BASE_URL  "$base"; setkv LLM_SMALL_API_KEY  "$key"
+fi
+setkv_default LLM_LARGE_MODEL  "$large_model"
+setkv_default LLM_MEDIUM_MODEL "$fast_model"
+setkv_default LLM_SMALL_MODEL  "$fast_model"
 # Slide and report layout starts pinned to GLM-5.1 — it produces the best
 # structure of the models tested, and OpenRouter carries it.
 setkv_default PRESENTATION_LLM_MODEL "z-ai/glm-5.1:nitro"
@@ -122,16 +198,18 @@ setkv_default PRINTABLE_LLM_MODEL    "z-ai/glm-5.1:nitro"
 # Model and dimension must agree or the Milvus collection is built at the wrong
 # width, so both are defaults: swap the model in .env and your dimension is
 # still there next time you re-run this to change a key.
-setkv EMBEDDING_BASE_URL  "$base"
+if [ -n "$key" ]; then
+  setkv EMBEDDING_BASE_URL "$base"
+  setkv EMBEDDING_API_KEY  "$key"
+  # Vision credentials are wired up even though the critique pass ships OFF
+  # (CRITIC_VISION_ENABLED=false, set below), so switching it on later is a
+  # one-line change rather than another trip through the wizard.
+  setkv VISION_BASE_URL "$base"
+  setkv VISION_API_KEY  "$key"
+fi
 setkv_default EMBEDDING_MODEL     "baai/bge-m3"
 setkv_default EMBEDDING_DIMENSION "768"
-setkv EMBEDDING_API_KEY   "$key"
-# Vision credentials are wired up even though the critique pass ships OFF
-# (CRITIC_VISION_ENABLED=false, set below), so switching it on later is a
-# one-line change rather than another trip through the wizard.
-setkv VISION_BASE_URL "$base"
 setkv_default VISION_MODEL    "qwen/qwen3-vl-32b-instruct"
-setkv VISION_API_KEY  "$key"
 echo "  [ok] one key configured for drafting and grounding"
 echo "       (vision credentials set too, but the critique pass stays off)"
 
@@ -158,15 +236,23 @@ echo
 echo "The model below is a QUICK-START DEFAULT — press Enter to accept it."
 echo "Other backends (any OpenAI-compatible image endpoint, or a self-hosted"
 echo "ComfyUI) are configurable later in .env; see the IMAGE_GEN_ notes there."
-rw="$(ask_secret "Runware API key (input hidden)")"
-if [ -z "$rw" ]; then
-  echo
-  echo "  [FAIL] no key entered. Decks would generate without any imagery," >&2
-  echo "         which is not what this product is for. Re-run once you have" >&2
-  echo "         a key — or, if you truly want imagery off, set the IMAGE_GEN_" >&2
-  echo "         variables yourself in .env and skip this wizard." >&2
-  exit 1
+cur_rw="$(getkv IMAGE_GEN_API_KEY)"
+if [ -n "$cur_rw" ]; then
+  echo "Stored key: $(mask "$cur_rw")  (${#cur_rw} characters)"
+  rw="$(ask_secret "Runware API key (input hidden; Enter keeps the stored one)")"
+  [ -z "$rw" ] && echo "  [ok] keeping the stored Runware key"
+else
+  rw="$(ask_secret "Runware API key (input hidden)")"
+  if [ -z "$rw" ]; then
+    echo
+    echo "  [FAIL] no key entered. Decks would generate without any imagery," >&2
+    echo "         which is not what this product is for. Re-run once you have" >&2
+    echo "         a key — or, if you truly want imagery off, set the IMAGE_GEN_" >&2
+    echo "         variables yourself in .env and skip this wizard." >&2
+    exit 1
+  fi
 fi
+[ -n "$rw" ] && echo "  [ok] key captured: $(mask "$rw")  (${#rw} characters)"
 # Asked rather than hardcoded so a Runware user can pick their model, but
 # defaulted so pressing Enter always yields a working config. The default is
 # the AIR id this repo ships and relies on: image_gen_api.py names it
@@ -178,8 +264,14 @@ fi
 # to the very keystroke that means "no change".
 rmodel_cur="$(getkv IMAGE_GEN_MODEL)"
 rmodel="$(ask "Runware model" "${rmodel_cur:-runware:400@1}")"
-setkv IMAGE_GEN_PROVIDER "runware"
-setkv IMAGE_GEN_API_KEY  "$rw"
+# Provider and key are rewritten only when a NEW key was entered — keeping the
+# stored key must not clobber a provider you switched by hand. The model
+# answer is applied either way: changing it is a legitimate reason to re-run.
+if [ -n "$rw" ]; then
+  setkv IMAGE_GEN_PROVIDER "runware"
+  setkv IMAGE_GEN_API_KEY  "$rw"
+fi
+setkv_default IMAGE_GEN_PROVIDER "runware"
 setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
 # Read ONLY by the openai-compatible provider (image_gen_providers.py); the
 # Runware provider ignores it. Cleared so a stale endpoint from a previous
@@ -187,10 +279,12 @@ setkv IMAGE_GEN_MODEL    "${rmodel:-runware:400@1}"
 # back, and so the file stops implying that editing this URL redirects Runware
 # traffic — it does not. Announced, because it is the one value here that is
 # deliberately discarded rather than preserved.
-if [ -n "$(getkv IMAGE_GEN_BASE_URL)" ]; then
-  echo "  [note] cleared IMAGE_GEN_BASE_URL — Runware does not read it"
+if [ -n "$rw" ]; then
+  if [ -n "$(getkv IMAGE_GEN_BASE_URL)" ]; then
+    echo "  [note] cleared IMAGE_GEN_BASE_URL — Runware does not read it"
+  fi
+  setkv IMAGE_GEN_BASE_URL ""
 fi
-setkv IMAGE_GEN_BASE_URL ""
 echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
 
 # Vision is a different thing from image generation, and it is OFF by default.
@@ -215,13 +309,20 @@ if [ -z "$(getkv ADMIN_EMAIL)" ] || [ -z "$(getkv ADMIN_PASSWORD)" ]; then
   if [ -n "$acc_email" ]; then
     acc_pw=""
     while [ -z "$acc_pw" ]; do
-      printf 'Password (min 8 characters): '
-      read -r acc_pw || { acc_pw=""; break; }
-      if [ "${#acc_pw}" -lt 8 ]; then echo "  [!!] too short — 8 characters minimum"; acc_pw=""; fi
+      # -s: nothing echoes while typing or pasting; the masked line after is
+      # how you verify a paste landed, and landed exactly once.
+      printf 'Password (min 8 characters; input hidden): '
+      read -rs acc_pw || { acc_pw=""; echo ""; break; }
+      echo ""
+      if [ "${#acc_pw}" -lt 8 ]; then
+        echo "  [!!] too short — 8 characters minimum (got ${#acc_pw})"
+        acc_pw=""
+      fi
     done
     if [ -n "$acc_pw" ]; then
       setkv ADMIN_EMAIL "$acc_email"
       setkv ADMIN_PASSWORD "$acc_pw"
+      echo "  [ok] password captured: $(mask "$acc_pw")  (${#acc_pw} characters)"
       echo "  [ok] will seed ${acc_email} at backend startup"
     fi
   fi
@@ -242,10 +343,11 @@ wiz_admin_pw="$(getkv ADMIN_PASSWORD)"
 echo "$(b "Done.")  Open  http://localhost:8094"
 echo ""
 if [ -n "$wiz_admin_email" ] && [ -n "$wiz_admin_pw" ]; then
-  echo "Sign in:  ${wiz_admin_email}  /  ${wiz_admin_pw}"
+  echo "Sign in:  ${wiz_admin_email}  /  $(mask "$wiz_admin_pw") (${#wiz_admin_pw} characters)"
   echo "          (your ADMIN_EMAIL / ADMIN_PASSWORD from .env, seeded at"
-  echo "          backend startup; restarting the backend resets this"
-  echo "          account's password to the .env value — its recovery path)"
+  echo "          backend startup — the password is the one you chose and is"
+  echo "          never printed; read it with: grep ^ADMIN_ .env. Restarting"
+  echo "          the backend resets it to the .env value — its recovery path)"
 else
   echo "Sign in:  register your account on the login screen's sign-up form —"
   echo "          nothing is seeded and no default credentials exist. (Set"

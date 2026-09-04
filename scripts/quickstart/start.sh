@@ -106,11 +106,14 @@ WEB_PORT="$(getenv WEB_HOST_PORT || true)";          WEB_PORT="${WEB_PORT:-8094}
 ADMIN_EMAIL_SHOWN="$(getenv ADMIN_EMAIL || true)"
 ADMIN_PASSWORD_SHOWN="$(getenv ADMIN_PASSWORD || true)"
 # No default credentials exist — the sign-in line tells the truth either way.
+# The password itself is never printed, only its shape: read it from .env.
 if [ -n "$ADMIN_EMAIL_SHOWN" ] && [ -n "$ADMIN_PASSWORD_SHOWN" ]; then
-  SIGNIN_BLOCK="   Sign in         ${ADMIN_EMAIL_SHOWN}  /  ${ADMIN_PASSWORD_SHOWN}
+  PW_MASKED="$(printf '%*s' "${#ADMIN_PASSWORD_SHOWN}" '' | tr ' ' '*')"
+  SIGNIN_BLOCK="   Sign in         ${ADMIN_EMAIL_SHOWN}  /  ${PW_MASKED} (${#ADMIN_PASSWORD_SHOWN} characters)
                    (your ADMIN_EMAIL / ADMIN_PASSWORD from .env, seeded at
-                   backend startup; restarting resets this account's
-                   password to the .env value — its recovery path)"
+                   backend startup — read it with: grep ^ADMIN_ .env;
+                   restarting resets this account's password to the .env
+                   value — its recovery path)"
 else
   SIGNIN_BLOCK="   Sign in         register your account from the web UI's
                    sign-up screen — nothing is seeded and no default
