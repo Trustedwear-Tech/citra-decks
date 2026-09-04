@@ -293,6 +293,14 @@ async def startup_services():
 
     register_revocation_checker(_is_token_revoked)
 
+    # Seeds the installer's ADMIN_EMAIL / ADMIN_PASSWORD account when both
+    # are set in .env; with them unset it seeds nothing (no defaults exist)
+    # and sign-up remains the way in. Synchronous and first on purpose: one
+    # tiny Mongo upsert, and if Mongo is not writable the product is down
+    # anyway — better to fail here, loudly, than at someone's login.
+    from api.local_auth import seed_default_account
+    seed_default_account()
+
     # Define initialization tasks that can run in parallel
     async def init_mongodb_optimizations():
         try:

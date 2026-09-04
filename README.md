@@ -340,20 +340,27 @@ machine without a port collision. Override any of them via `.env`
 `MILVUS_METRICS_PORT`, `REDIS_HOST_PORT`, `MINIO_API_PORT`,
 `MINIO_CONSOLE_PORT`) if you'd rather use the defaults.
 
-There is no seeded account — register your first user from the web UI's sign-up
-screen. `api/local_auth.py` issues its own JWTs (bcrypt-hashed passwords, a
-`users` collection); there is no separate user-service to stand up.
+**No default credentials exist** — a default is a credential every install
+shares. Sign in with the account YOU chose: either register from the web UI's
+sign-up screen, or set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `.env` (the wizard
+asks) and the backend creates that account at startup. `api/local_auth.py`
+issues its own JWTs (bcrypt-hashed passwords, a `users` collection); there is
+no separate user-service to stand up.
 
-Three things to know about those accounts:
+Four things to know about those accounts:
 
 - **All accounts are equal.** There is no admin role and no orgs — every
   account is its own private workspace (its `personal_sa_id` owns its folders,
-  decks and reports).
+  decks and reports). A seeded account is an ordinary account whose
+  credentials happen to live in `.env`, nothing more.
+- **The seeded account's password resets to the `.env` value** on every
+  backend restart — which is also its recovery path.
 - **Registration is open** to anyone who can reach the port. Fine on a laptop;
   on a shared network, front it with something that controls access.
-- **Password reset is not wired up.** The forgot-password endpoint is a
-  deliberate stub (it never sends anything), so a lost password means resetting
-  the hash in Mongo by hand. Keep your password safe.
+- **Password reset is not wired up** for registered accounts. The
+  forgot-password endpoint is a deliberate stub (it never sends anything), so a
+  lost password means resetting the hash in Mongo by hand. Keep your password
+  safe.
 
 ## Architecture
 

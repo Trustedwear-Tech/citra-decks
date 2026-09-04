@@ -48,6 +48,57 @@ def get_users_collection():
     return client[MONGODB_DATABASE].users
 
 
+def seed_default_account() -> None:
+    """Make ADMIN_EMAIL / ADMIN_PASSWORD from .env exist, at every startup.
+
+    Strictly the INSTALLER'S values — there are no default credentials,
+    deliberately: a default is a credential every install shares. When either
+    variable is unset, nothing is seeded and decks is what it always was:
+    register from the sign-up screen. When both are set, only the ADMIN_EMAIL
+    account is touched. Upserting (rather than create-if-missing) is
+    deliberate — forgot-password is a stub, so editing ADMIN_PASSWORD in .env
+    and restarting the backend is the one supported way to recover this
+    account. It is an ordinary equal account, not an admin role.
+
+    Called from startup_services(); a failure propagates (RULE #1) — if Mongo
+    cannot be written the product is down anyway, and hiding that here would
+    surface it as a confusing login failure instead.
+    """
+    email = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
+    password = os.getenv("ADMIN_PASSWORD") or ""
+    if not email or not password:
+        logger.info(
+            "🔐 [LOCAL_AUTH] ADMIN_EMAIL / ADMIN_PASSWORD not set — no account "
+            "seeded (none exist by default); register from the sign-up screen"
+        )
+        return
+    if not EMAIL_RE.match(email):
+        raise ValueError(f"ADMIN_EMAIL {email!r} is not a valid email address")
+
+    users = get_users_collection()
+    password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    now = datetime.now(timezone.utc)
+    existing = users.find_one({"_id": email})
+    if existing:
+        users.update_one(
+            {"_id": email},
+            {"$set": {"password_hash": password_hash, "updated_at": now}},
+        )
+        logger.info(f"🔐 [LOCAL_AUTH] Default account {email} exists — password reset to the .env value")
+        return
+    users.insert_one({
+        "_id": email,
+        "email": email,
+        "name": "Admin",
+        "password_hash": password_hash,
+        "personal_sa_id": f"sa_personal_{uuid.uuid4()}",
+        "terms_accepted_at": None,
+        "created_at": now,
+        "updated_at": now,
+    })
+    logger.info(f"🔐 [LOCAL_AUTH] Seeded account {email} from .env (an ordinary account — decks has no admin role)")
+
+
 def _issue_token(user_doc: dict) -> str:
     secret = os.getenv("JWT_SECRET")
     if not secret:

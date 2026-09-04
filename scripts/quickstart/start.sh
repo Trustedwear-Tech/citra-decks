@@ -103,6 +103,20 @@ fi
 # compose defaults are being used — so grep exits 1, the pipeline fails, and
 # the script would abort here without ever printing the banner.
 WEB_PORT="$(getenv WEB_HOST_PORT || true)";          WEB_PORT="${WEB_PORT:-8094}"
+ADMIN_EMAIL_SHOWN="$(getenv ADMIN_EMAIL || true)"
+ADMIN_PASSWORD_SHOWN="$(getenv ADMIN_PASSWORD || true)"
+# No default credentials exist — the sign-in line tells the truth either way.
+if [ -n "$ADMIN_EMAIL_SHOWN" ] && [ -n "$ADMIN_PASSWORD_SHOWN" ]; then
+  SIGNIN_BLOCK="   Sign in         ${ADMIN_EMAIL_SHOWN}  /  ${ADMIN_PASSWORD_SHOWN}
+                   (your ADMIN_EMAIL / ADMIN_PASSWORD from .env, seeded at
+                   backend startup; restarting resets this account's
+                   password to the .env value — its recovery path)"
+else
+  SIGNIN_BLOCK="   Sign in         register your account from the web UI's
+                   sign-up screen — nothing is seeded and no default
+                   credentials exist. (Set ADMIN_EMAIL / ADMIN_PASSWORD in
+                   .env to seed your own at startup.)"
+fi
 BACKEND_PORT="$(getenv BACKEND_HOST_PORT || true)";  BACKEND_PORT="${BACKEND_PORT:-8093}"
 CONSOLE_PORT="$(getenv MINIO_CONSOLE_PORT || true)"; CONSOLE_PORT="${CONSOLE_PORT:-9023}"
 
@@ -116,15 +130,12 @@ citra-decks is running.
    Collaboration   ws://localhost:1234    (health: /health)
    MinIO console   http://localhost:${CONSOLE_PORT}
 
-   Sign in: nothing is seeded — register your first account from the web
-   UI's sign-up screen (any email + password; accounts are created on
-   demand by api/local_auth.py, stored in this stack's own Mongo).
+${SIGNIN_BLOCK}
 
-   All accounts are equal: no admin role, no orgs — each account is its
-   own private workspace. Registration is open to anyone who can reach
-   this port, and password reset is NOT wired up (the forgot-password
-   endpoint is a stub) — run this on a network you trust, and keep your
-   password safe.
+   All accounts are equal: no admin role, no orgs — each is its own
+   private workspace. Registration is open to anyone who can reach this
+   port, and password reset is NOT wired up for registered accounts —
+   keep your password safe.
 
    Guide           README.md
 ----------------------------------------------------------------------------

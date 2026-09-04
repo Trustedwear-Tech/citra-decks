@@ -201,6 +201,32 @@ echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have 
 # to update a key must not turn it off again behind you.
 setkv_default CRITIC_VISION_ENABLED "false"
 
+# -- Your account (optional seed; no defaults exist) -------------------------------
+# A default credential is a credential every install shares, so there is none.
+# Enter your own here to have the backend create the account at startup, or
+# leave blank and register from the web UI's sign-up screen.
+if [ -z "$(getkv ADMIN_EMAIL)" ] || [ -z "$(getkv ADMIN_PASSWORD)" ]; then
+  hr; echo "$(b "Your account")"
+  echo "No default credentials exist. Enter an email + password to have your"
+  echo "account created at backend startup — or leave blank to register from"
+  echo "the web UI's sign-up screen instead."
+  printf 'Email (blank = register in the UI): '
+  read -r acc_email || acc_email=""
+  if [ -n "$acc_email" ]; then
+    acc_pw=""
+    while [ -z "$acc_pw" ]; do
+      printf 'Password (min 8 characters): '
+      read -r acc_pw || { acc_pw=""; break; }
+      if [ "${#acc_pw}" -lt 8 ]; then echo "  [!!] too short — 8 characters minimum"; acc_pw=""; fi
+    done
+    if [ -n "$acc_pw" ]; then
+      setkv ADMIN_EMAIL "$acc_email"
+      setkv ADMIN_PASSWORD "$acc_pw"
+      echo "  [ok] will seed ${acc_email} at backend startup"
+    fi
+  fi
+fi
+
 # -- 4. Bring it up ---------------------------------------------------------------
 hr; echo "$(b "Step 4/4 — bring up the stack")"
 if yes_no "Run setup now (data stores)?" "y"; then
@@ -211,10 +237,22 @@ if yes_no "Start all services?" "y"; then
 fi
 
 hr
-echo "$(b "Done.")  Open  http://localhost:8094  and create your first account."
-echo "Nothing is seeded — sign-up is right on the login screen (any email +"
-echo "password). All accounts are equal: no admin role, no orgs — each account"
-echo "is its own private workspace. Registration is open to anyone who can"
-echo "reach the port, and password reset is not wired up, so run this on a"
-echo "network you trust and keep your password safe."
+wiz_admin_email="$(getkv ADMIN_EMAIL)"
+wiz_admin_pw="$(getkv ADMIN_PASSWORD)"
+echo "$(b "Done.")  Open  http://localhost:8094"
+echo ""
+if [ -n "$wiz_admin_email" ] && [ -n "$wiz_admin_pw" ]; then
+  echo "Sign in:  ${wiz_admin_email}  /  ${wiz_admin_pw}"
+  echo "          (your ADMIN_EMAIL / ADMIN_PASSWORD from .env, seeded at"
+  echo "          backend startup; restarting the backend resets this"
+  echo "          account's password to the .env value — its recovery path)"
+else
+  echo "Sign in:  register your account on the login screen's sign-up form —"
+  echo "          nothing is seeded and no default credentials exist. (Set"
+  echo "          ADMIN_EMAIL / ADMIN_PASSWORD in .env to seed your own.)"
+fi
+echo ""
+echo "All accounts are equal: no admin role, no orgs — each account is its own"
+echo "private workspace. Registration is open to anyone who can reach the port,"
+echo "and password reset is not wired up for registered accounts."
 echo "Re-run this wizard any time to change keys:  ./scripts/quickstart/wizard.sh"
