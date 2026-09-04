@@ -229,7 +229,12 @@ echo "The composers call an LLM to draft, an embedding model to ground that"
 echo "draft in your documents, and a vision model to read images. One"
 echo "OpenRouter key covers all three."
 echo
-echo "  Get a key: $(b "https://openrouter.ai/keys")"
+echo "  No key yet? Create a free account at https://openrouter.ai, then make"
+echo "  a new key at $(b "https://openrouter.ai/keys"). The account and the key"
+echo "  cost nothing; usage is pay-as-you-go — light usage costs pennies, and"
+echo "  heavier or sustained usage needs a small credit balance bought up"
+echo "  front. (The quick-start models are paid, pay-per-use; rate-limited"
+echo "  free-tier models exist too — swap the model names in .env to use them.)"
 # Resume-friendly: "re-run any time to change a key" must not demand keys that
 # are already stored. Enter keeps the stored one; the FAIL applies only when
 # there is nothing to keep.
