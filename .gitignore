@@ -90,3 +90,6 @@ Thumbs.db
 .coverage
 *.xlsx
 downloaded_file_*
+
+# Setup wizard checkpoint log (and its --fresh archives)
+.wizard-state.log*

@@ -77,8 +77,59 @@ yes_no() { local q="$1" def="${2:-y}" a; a="$(ask "$q (y/n)" "$def")"; case "$a"
 # paste landed — and, via the length, that it landed exactly once.
 mask() { printf '%*s' "${#1}" '' | tr ' ' '*'; }
 
+# --- Checkpoints -------------------------------------------------------------
+# Every completed step is appended to .wizard-state.log (gitignored), and a
+# failing run records the step it died in — so the next run can say exactly
+# where the last one got to. The log is a RECORD, not an authority: the
+# progress report re-verifies every step against .env and Docker, because a
+# log that outlives a manual `docker compose down -v` would otherwise lie.
+STATE_FILE="$REPO_ROOT/.wizard-state.log"
+CURRENT_STEP="preflight"
+ckpt() { printf '%s  done: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$STATE_FILE"; }
+trap 'rc=$?; if [ "$rc" -ne 0 ]; then
+        word="FAILED"; case "$rc" in 130|143) word="INTERRUPTED";; esac
+        printf "%s  %s during: %s (exit %s)\n" "$(date '\''+%Y-%m-%d %H:%M:%S'\'')" "$word" "$CURRENT_STEP" "$rc" >> "$STATE_FILE"
+        echo "" >&2
+        echo "  [!!] $word during: $CURRENT_STEP. Completed steps are kept —" >&2
+        echo "       just re-run the wizard; it resumes from here." >&2
+      fi' EXIT
+# Ctrl-C / kill: without these, bash skips the EXIT trap on a fatal signal
+# and the interruption would never reach the state log.
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+progress_report() {
+  local s_env="pending" s_or="pending" s_rw="pending" s_ds="pending" s_sv="pending" s_acc
+  [ -f "$ENV_FILE" ] && s_env="done   "
+  [ -n "$(getkv LLM_LARGE_API_KEY)" ]  && s_or="done   "
+  [ -n "$(getkv IMAGE_GEN_API_KEY)" ]  && s_rw="done   "
+  docker compose ps -q mongodb 2>/dev/null | grep -q . && s_ds="running"
+  docker compose ps -q backend 2>/dev/null | grep -q . && s_sv="running"
+  if [ -n "$(getkv ADMIN_EMAIL)" ] && [ -n "$(getkv ADMIN_PASSWORD)" ]; then
+    s_acc="seed-on-boot"
+  else
+    s_acc="registration"
+  fi
+  echo ""
+  echo "Progress — verified against .env and Docker, not just the log:"
+  echo "  [${s_env}] .env with generated secrets"
+  echo "  [${s_or}] OpenRouter key"
+  echo "  [${s_rw}] Runware key"
+  echo "  [${s_acc}] your account mode (both are fine — see --help)"
+  echo "  [${s_ds}] data stores (mongo, redis, milvus, minio)"
+  echo "  [${s_sv}] services (backend, collaboration, web)"
+  if [ -f "$STATE_FILE" ]; then
+    echo "  log: .wizard-state.log — last entry:"
+    tail -1 "$STATE_FILE" | sed 's/^/    /'
+    case "$(tail -1 "$STATE_FILE")" in
+      *FAILED*|*INTERRUPTED*) echo "  Resuming from that step now." ;;
+    esac
+  fi
+  echo "'pending' runs now; 'done' is kept — Enter keeps stored keys."
+}
+
 rand()  { openssl rand -hex "$1" 2>/dev/null || head -c "$((${1}*2))" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
-getkv() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- ; }
+getkv() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- || true; }
 # Quick-start DEFAULTS, as distinct from credentials. Written only when the key
 # is missing or empty, so re-running the wizard to update a key never reverts a
 # model you tuned by hand. Step 1 promises your values are preserved; before
@@ -109,9 +160,13 @@ if [ "$FRESH" = 1 ]; then
   echo "upload and account in this install is gone for good."
   echo ".env is moved aside to .env.bak.<timestamp>, not deleted."
   if ! yes_no "Continue?" "n"; then
+    # A declined confirmation is a decision, not a failure — disarm the
+    # failure trap so the state log does not record it as one.
+    trap - EXIT
     echo "Aborted — nothing was touched."
     exit 1
   fi
+  CURRENT_STEP="fresh cleanup (down -v)"
   docker compose down -v --remove-orphans
   echo "  [ok] stack stopped, volumes removed"
   if [ -f "$ENV_FILE" ]; then
@@ -119,10 +174,17 @@ if [ "$FRESH" = 1 ]; then
     mv "$ENV_FILE" "$bak"
     echo "  [ok] old .env moved to ${bak##*/} (restore it with: mv ${bak##*/} .env)"
   fi
+  # The old log describes the install that was just deleted; archive it with
+  # the .env so the new log starts at zero and cannot claim finished steps.
+  [ -f "$STATE_FILE" ] && mv "$STATE_FILE" "$STATE_FILE.bak.$(date +%Y%m%d-%H%M%S)"
+  ckpt "fresh cleanup — volumes deleted, previous .env and state log archived"
 fi
+
+progress_report
 
 # -- 1. .env ------------------------------------------------------------------
 hr; echo "$(b "Step 1/4 — environment file")"
+CURRENT_STEP="environment file"
 if [ -f "$ENV_FILE" ]; then
   echo "Found an existing .env — keeping it. The keys you enter below are"
   echo "updated; models and settings you tuned by hand are left as they are."
@@ -135,6 +197,7 @@ else
   setkv JWT_SECRET "$(rand 48)"
   setkv CONNECTION_ENCRYPTION_KEY "$(rand 32)"
   echo "  [ok] secrets generated (Mongo password, JWT secret, encryption key)"
+  ckpt ".env created with fresh secrets"
 fi
 
 # -- 2. AI provider -------------------------------------------------------------
@@ -145,6 +208,7 @@ fi
 # composers came up unable to ground anything in their documents, silently.
 # Every default below is open-weights and swappable by editing .env.
 hr; echo "$(b "Step 2/4 — AI provider (required)")"
+CURRENT_STEP="AI provider (OpenRouter key)"
 echo "The composers call an LLM to draft, an embedding model to ground that"
 echo "draft in your documents, and a vision model to read images. One"
 echo "OpenRouter key covers all three."
@@ -212,6 +276,7 @@ setkv_default EMBEDDING_DIMENSION "768"
 setkv_default VISION_MODEL    "qwen/qwen3-vl-32b-instruct"
 echo "  [ok] one key configured for drafting and grounding"
 echo "       (vision credentials set too, but the critique pass stays off)"
+[ -n "$key" ] && ckpt "OpenRouter key configured"
 
 # -- 3. Image generation ----------------------------------------------------------
 # Required, and deliberately Runware only. Without imagery a generated deck is
@@ -225,6 +290,7 @@ echo "       (vision credentials set too, but the critique pass stays off)"
 # wizard's job is to produce a configuration that works on the first run rather
 # than to enumerate every possibility.
 hr; echo "$(b "Step 3/4 — image generation (required)")"
+CURRENT_STEP="image generation (Runware key)"
 echo "Runware generates the cover art and section imagery on your slides and"
 echo "report pages. Without it decks come out plain: text and charts only —"
 echo "the biggest single difference in how the output looks. A few cents per"
@@ -286,6 +352,7 @@ if [ -n "$rw" ]; then
   setkv IMAGE_GEN_BASE_URL ""
 fi
 echo "  [ok] Runware configured (${rmodel:-runware:400@1}) — slides will have imagery"
+[ -n "$rw" ] && ckpt "Runware key configured"
 
 # Vision is a different thing from image generation, and it is OFF by default.
 # It re-renders each finished slide and sends the image to a vision model to
@@ -299,6 +366,7 @@ setkv_default CRITIC_VISION_ENABLED "false"
 # A default credential is a credential every install shares, so there is none.
 # Enter your own here to have the backend create the account at startup, or
 # leave blank and register from the web UI's sign-up screen.
+CURRENT_STEP="your account (optional seed)"
 if [ -z "$(getkv ADMIN_EMAIL)" ] || [ -z "$(getkv ADMIN_PASSWORD)" ]; then
   hr; echo "$(b "Your account")"
   echo "No default credentials exist. Enter an email + password to have your"
@@ -324,6 +392,7 @@ if [ -z "$(getkv ADMIN_EMAIL)" ] || [ -z "$(getkv ADMIN_PASSWORD)" ]; then
       setkv ADMIN_PASSWORD "$acc_pw"
       echo "  [ok] password captured: $(mask "$acc_pw")  (${#acc_pw} characters)"
       echo "  [ok] will seed ${acc_email} at backend startup"
+      ckpt "account configured for seeding (${acc_email})"
     fi
   fi
 fi
@@ -331,11 +400,16 @@ fi
 # -- 4. Bring it up ---------------------------------------------------------------
 hr; echo "$(b "Step 4/4 — bring up the stack")"
 if yes_no "Run setup now (data stores)?" "y"; then
+  CURRENT_STEP="data stores (setup.sh)"
   "$REPO_ROOT/scripts/quickstart/setup.sh"
+  ckpt "data stores up (setup.sh)"
 fi
 if yes_no "Start all services?" "y"; then
+  CURRENT_STEP="services (start.sh)"
   "$REPO_ROOT/scripts/quickstart/start.sh"
+  ckpt "services up (start.sh)"
 fi
+CURRENT_STEP="done"
 
 hr
 wiz_admin_email="$(getkv ADMIN_EMAIL)"
@@ -358,3 +432,4 @@ echo "All accounts are equal: no admin role, no orgs — each account is its own
 echo "private workspace. Registration is open to anyone who can reach the port,"
 echo "and password reset is not wired up for registered accounts."
 echo "Re-run this wizard any time to change keys:  ./scripts/quickstart/wizard.sh"
+ckpt "done — wizard complete"
