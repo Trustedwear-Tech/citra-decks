@@ -530,7 +530,7 @@ model endpoint for generation.
 
 ## Community
 
-**Discord:** https://discordapp.com/channels/1519703038724669551/1519703039416467518
+**Discord:** https://discord.gg/yhQA8fwKZ
 — shared with Citra Flows and Citra Projects. Questions, setup issues, or
 what a real deployment needs that isn't here yet.
 
