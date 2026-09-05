@@ -297,8 +297,8 @@ tag from the Releases page):
 
 ```bash
 # Linux / macOS
-curl -sSL https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.3.tar.gz | tar xz
-cd citra-decks-0.1.3
+curl -sSL https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.4.tar.gz | tar xz
+cd citra-decks-0.1.4
 make wizard
 ```
 
@@ -306,9 +306,9 @@ make wizard
 # Windows PowerShell — must be curl.exe (bare `curl` is PowerShell's alias for
 # Invoke-WebRequest), and downloading before extracting avoids the binary-pipe
 # corruption in Windows PowerShell. curl.exe and tar ship with Windows 10+.
-curl.exe -sSLo citra-decks.tar.gz https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.3.tar.gz
+curl.exe -sSLo citra-decks.tar.gz https://github.com/Trustedwear-Tech/citra-decks/archive/refs/tags/v0.1.4.tar.gz
 tar xzf citra-decks.tar.gz
-cd citra-decks-0.1.3
+cd citra-decks-0.1.4
 # then, from Git Bash:  bash scripts/quickstart/wizard.sh
 ```
 
